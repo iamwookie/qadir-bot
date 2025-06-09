@@ -1,7 +1,6 @@
 import discord
 
 from dotenv import load_dotenv
-from client import Client
 
 load_dotenv()
 
