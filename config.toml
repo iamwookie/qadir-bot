@@ -1,0 +1,7 @@
+[app]
+name="Qadir"
+debug=false
+version="1.0.0"
+
+[bot]
+guild=0

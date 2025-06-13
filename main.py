@@ -1,11 +1,24 @@
+import logging
+import tomllib
 import os
 
 from dotenv import load_dotenv
 from discord import Intents
-from bot import QadirBot
 
-load_dotenv()
+# Core
+from core import QadirBot
 
-bot = QadirBot(intents=Intents.default())
+if __name__ == "__main__":
+    load_dotenv()
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+
+    if config["app"]["debug"]:
+        logging.basicConfig(level=logging.DEBUG)
+
+    bot = QadirBot(intents=Intents.default(), config=config)
+    
+    bot.load_extension("cogs.utility")
+
+    bot.run(os.getenv("DISCORD_TOKEN"))
