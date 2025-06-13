@@ -1,13 +1,11 @@
-import discord
+import os
 
 from dotenv import load_dotenv
+from discord import Intents
+from bot import QadirBot
 
 load_dotenv()
 
-bot = discord.Bot(intents=discord.Intents.default())
-
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
+bot = QadirBot(intents=Intents.default())
 
 bot.run(os.getenv("DISCORD_TOKEN"))
