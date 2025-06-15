@@ -18,13 +18,17 @@ class QadirBot(discord.Bot):
 
     @property
     def config(self) -> dict:
+        """Configuration settings for the Bot."""
         return self.__config
 
     async def on_ready(self):
-        version = self.config.get("app").get("version", "0")
+        version = self.config.get("app").get("version")
 
-        print(f"✅ Logged in as: {self.user} (ID: {self.user.id}) (v{version})")
-        print(f"🌐 Connected to {len(self.guilds)} guild(s):")
+        print("⚙️ \u200b Loaded Cogs:")
+        for cogs in self.cogs:
+            print(f"  - {cogs}")
 
-        for guild in self.guilds:
-            print(f" - {guild.name} (ID: {guild.id})")
+        print(f"✅ Logged in as: {self.user} (ID: {self.user.id}) (v{version}) ({len(self.guilds)} guilds)")
+
+    async def on_error(self, event_method, *args, **kwargs):
+        return await super().on_error(event_method, *args, **kwargs)

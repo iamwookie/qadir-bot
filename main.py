@@ -18,7 +18,8 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.DEBUG)
 
     bot = QadirBot(intents=Intents.default(), config=config)
-    
+
     bot.load_extension("cogs.utility")
+    bot.load_extension("cogs.proposals")
 
     bot.run(os.getenv("DISCORD_TOKEN"))

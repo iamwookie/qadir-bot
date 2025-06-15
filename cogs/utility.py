@@ -1,5 +1,5 @@
 from discord.ext import commands
-from discord import SlashCommandGroup, Embed
+from discord import Embed
 from core import QadirBot
 
 
@@ -14,9 +14,7 @@ class UtilityCog(commands.Cog):
         """Responds with latency information."""
 
         ping = round(self.bot.latency * 1000)  # Convert to milliseconds
-        embed = Embed(
-            title="Pong!", description=f"Latency: `{ping} ms`", color=0x00FF00
-        )
+        embed = Embed(title="Pong!", description=f"Latency: `{ping} ms`", color=0x00FF00)
 
         await ctx.respond(embed=embed)
 
@@ -24,9 +22,11 @@ class UtilityCog(commands.Cog):
     async def info(self, ctx):
         """Displays information about the app."""
 
+        owner_id = "244662779745665026"
+
         embed = Embed(
             title="App Information",
-            description="This is a magical app created by <@244662779745665026>.",
+            description=f"This is a magical app created by <@{owner_id}>.",
             color=0x00FF00,
         )
         embed.add_field(name="Bot User", value=f"`{self.bot.user}`", inline=True)
@@ -37,4 +37,3 @@ class UtilityCog(commands.Cog):
 
 def setup(bot: QadirBot):
     bot.add_cog(UtilityCog(bot))
-    print("⚙️ \u200b Utility cog loaded.")

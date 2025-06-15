@@ -3,5 +3,6 @@ name="Qadir"
 debug=false
 version="1.0.0"
 
-[bot]
-guild=0
+[proposals]
+guilds=[ 1121743509372805122 ]
+threads=[ 1365430867782008903 ]
