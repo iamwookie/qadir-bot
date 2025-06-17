@@ -1,3 +1,3 @@
-from .proposals import CreateProposalModal
+from .create_proposal import CreateProposalModal
 
 __all__ = ["CreateProposalModal"]

@@ -4,3 +4,6 @@ venv/
 
 # Environment
 .env
+
+# Logs
+*.log

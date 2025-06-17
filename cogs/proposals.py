@@ -8,9 +8,10 @@ from modals import CreateProposalModal
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
 
-GUILD_IDS: list[int] = config.get("proposals").get("guilds")
+GUILD_IDS: list[int] = config["proposals"]["guilds"]
 
 
+# guild_ids is a part of command_attrs in CogMeta
 class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
     """A cog for managing proposals."""
 
@@ -18,11 +19,10 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         self.bot = bot
 
     @commands.slash_command()
-    async def propose(self, ctx: discord.ApplicationContext):
+    async def propose(self, ctx: discord.ApplicationContext) -> None:
         """Submit a proposal."""
 
         modal = CreateProposalModal(title="Create a Proposal")
-
         await ctx.send_modal(modal)
 
 

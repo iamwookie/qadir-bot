@@ -1,4 +1,7 @@
+import logging
 import discord
+
+logger = logging.getLogger("qadir")
 
 
 class QadirBot(discord.Bot):
@@ -21,14 +24,14 @@ class QadirBot(discord.Bot):
         """Configuration settings for the Bot."""
         return self.__config
 
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         version = self.config.get("app").get("version")
 
         print("⚙️ \u200b Loaded Cogs:")
         for cogs in self.cogs:
             print(f"  - {cogs}")
 
-        print(f"✅ Logged in as: {self.user} (ID: {self.user.id}) (v{version}) ({len(self.guilds)} guilds)")
+        print(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
 
-    async def on_error(self, event_method, *args, **kwargs):
-        return await super().on_error(event_method, *args, **kwargs)
+    async def on_application_command_error(self, _: discord.ApplicationContext, exception: Exception):
+        logger.error("Application Command Error:", exc_info=exception)
