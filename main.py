@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 
+import sys
 import tomllib
 import logging
 import os
@@ -22,7 +23,7 @@ if __name__ == "__main__":
     logger.propagate = False
     logger.setLevel(logging.DEBUG if config["app"]["debug"] else logging.INFO)
 
-    stream_handler = logging.StreamHandler()
+    stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
 
     file_handler = logging.FileHandler(filename="qadir.log", encoding="utf-8", mode="w")
