@@ -1,7 +1,6 @@
 import tomllib
 import logging
 import discord
-import datetime
 import re
 
 with open("config.toml", "rb") as f:
