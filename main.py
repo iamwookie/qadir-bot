@@ -1,8 +1,10 @@
-import logging
+from dotenv import load_dotenv
+
 import tomllib
+import logging
 import os
 
-from dotenv import load_dotenv
+# Discord
 from discord import Intents
 
 # Core
@@ -14,7 +16,10 @@ if __name__ == "__main__":
     with open("config.toml", "rb") as f:
         config = tomllib.load(f)
 
+    logging.basicConfig(level=logging.DEBUG if config["app"]["debug"] else None)
+
     logger = logging.getLogger("qadir")
+    logger.propagate = False
     logger.setLevel(logging.DEBUG if config["app"]["debug"] else logging.INFO)
 
     stream_handler = logging.StreamHandler()

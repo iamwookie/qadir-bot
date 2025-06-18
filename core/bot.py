@@ -10,12 +10,12 @@ class QadirBot(discord.Bot):
     def __init__(self, *args, **options):
         self.__config = options.pop("config", None)
 
+        logger.info("⏳ Initializing...")
+
         if self.__config:
-            print("✅ Configuration loaded successfully.")
+            logger.info("✅ Configuration loaded successfully.")
         else:
             raise ValueError("Configuration is empty!")
-
-        print("⏳ Initializing...")
 
         super().__init__(*args, **options)
 
@@ -27,11 +27,10 @@ class QadirBot(discord.Bot):
     async def on_ready(self) -> None:
         version = self.config.get("app").get("version")
 
-        print("⚙️ \u200b Loaded Cogs:")
-        for cogs in self.cogs:
-            print(f"  - {cogs}")
+        for cog in self.cogs:
+            logger.info(f"🔗 Loaded Cog: {cog}")
 
-        print(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
+        logger.info(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
 
-    async def on_application_command_error(self, _: discord.ApplicationContext, exception: Exception):
-        logger.error("Application Command Error:", exc_info=exception)
+    async def on_application_command_error(self, _: discord.ApplicationContext, exception: Exception) -> None:
+        logger.error("[BOT] Application Command Error:", exc_info=exception)
