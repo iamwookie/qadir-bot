@@ -1,5 +1,5 @@
+from discord import ApplicationContext, Embed
 from discord.ext import commands
-from discord import Embed
 from core import QadirBot
 
 
@@ -10,27 +10,21 @@ class UtilityCog(commands.Cog):
         self.bot = bot
 
     @commands.slash_command()
-    async def ping(self, ctx):
-        """Responds with latency information."""
+    async def ping(self, ctx: ApplicationContext):
+        """Ping the application."""
 
-        ping = round(self.bot.latency * 1000)  # Convert to milliseconds
-        embed = Embed(title="Pong!", description=f"Latency: `{ping} ms`", color=0x00FF00)
-
-        await ctx.respond(embed=embed)
+        await ctx.respond("🟢 Pong!", ephemeral=True)
 
     @commands.slash_command()
     async def info(self, ctx):
         """Displays information about the app."""
 
-        owner_id = "244662779745665026"
+        dev_id = 244662779745665026
 
-        embed = Embed(
-            title="App Information",
-            description=f"This is a magical app created by <@{owner_id}>.",
-            color=0x00FF00,
-        )
-        embed.add_field(name="Bot User", value=f"`{self.bot.user}`", inline=True)
-        embed.add_field(name="Bot ID", value=f"`{self.bot.user.id}`", inline=True)
+        embed = Embed(title="App Information", description=f"A magical application created by <@{dev_id}>.", color=0x00FF00)
+        embed.add_field(name="Version", value=f"`{self.bot.config["app"]["version"]}`")
+        embed.add_field(name="Latency", value=f"`{round(self.bot.latency * 100)} ms`")
+        embed.add_field(name="Guilds", value=f"`{len(self.bot.guilds)}`", inline=False)
 
         await ctx.respond(embed=embed)
 
