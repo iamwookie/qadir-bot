@@ -1,10 +1,11 @@
 import logging
-import discord
+
+from discord import Bot, ApplicationContext
 
 logger = logging.getLogger("qadir")
 
 
-class QadirBot(discord.Bot):
+class QadirBot(Bot):
     """A custom Discord bot class for Qadir."""
 
     def __init__(self, *args, **options):
@@ -32,5 +33,5 @@ class QadirBot(discord.Bot):
 
         logger.info(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
 
-    async def on_application_command_error(self, _: discord.ApplicationContext, exception: Exception) -> None:
+    async def on_application_command_error(self, _: ApplicationContext, exception: Exception) -> None:
         logger.error("[BOT] Application Command Error:", exc_info=exception)

@@ -1,7 +1,7 @@
 import tomllib
 import logging
-import discord
 
+from discord import ApplicationContext
 from discord.ext import commands
 from core import QadirBot
 from modals import CreateProposalModal
@@ -22,7 +22,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
     def __init__(self, bot: QadirBot):
         self.bot = bot
 
-    async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
+    async def cog_check(self, ctx: ApplicationContext) -> bool:
         """Check if the command is used by allowed roles."""
 
         for role_id in ROLE_IDS:
@@ -33,13 +33,13 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
     @commands.slash_command()
     @commands.has_any_role(*ROLE_IDS)
-    async def propose(self, ctx: discord.ApplicationContext) -> None:
+    async def propose(self, ctx: ApplicationContext) -> None:
         """Submit a proposal."""
 
         modal = CreateProposalModal(title="Create a Proposal")
         await ctx.send_modal(modal)
 
-    async def cog_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
+    async def cog_command_error(self, ctx: ApplicationContext, error: Exception) -> None:
         """Handle command errors."""
 
         try:

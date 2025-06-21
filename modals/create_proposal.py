@@ -45,7 +45,7 @@ class CreateProposalModal(discord.ui.Modal):
 
         thread = await channel.create_thread(name=thread_title, type=discord.ChannelType.public_thread)
 
-        proposal_embed = discord.Embed(title=thread_title, description=self.children[1].value, colour=discord.Colour.blue())
+        proposal_embed = discord.Embed(title=thread_title, description=self.children[1].value, colour=0xFFFFFF)
         proposal_embed.add_field(name="Reasoning", value=self.children[2].value, inline=False)
         proposal_embed.add_field(name="Expected Outcome", value=self.children[3].value, inline=False)
         proposal_embed.set_footer(text=interaction.user, icon_url=interaction.user.display_avatar.url)
