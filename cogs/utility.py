@@ -27,7 +27,7 @@ class UtilityCog(commands.Cog):
         embed.add_field(name="Latency", value=f"`{round(self.bot.latency * 100)} ms`")
         embed.add_field(name="Guilds", value=f"`{len(self.bot.guilds)}`", inline=False)
 
-        await ctx.respond(embed=embed)
+        await ctx.respond(embed=embed, ephemeral=True)
 
     @commands.slash_command()
     async def help(self, ctx: discord.ApplicationContext):
