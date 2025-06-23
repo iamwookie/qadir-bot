@@ -7,3 +7,6 @@ venv/
 
 # Logs
 *.log
+
+# Extras
+.vscode/
