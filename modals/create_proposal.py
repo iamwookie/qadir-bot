@@ -1,7 +1,10 @@
 import tomllib
 import logging
 import discord
+import json
 import re
+
+from core import QadirBot
 
 with open("config.toml", "rb") as f:
     config = tomllib.load(f)
@@ -57,5 +60,9 @@ class CreateProposalModal(discord.ui.Modal):
 
         await message.add_reaction("👍")
         await message.add_reaction("👎")
+
+        client: QadirBot = interaction.client
+
+        await client.redis.sadd("qadir:proposals", json.dumps({"thread_id": thread.id, "message_id": message.id}))
 
         await interaction.followup.send(f"Your proposal has been created in {thread.mention}.", ephemeral=True)

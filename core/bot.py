@@ -1,6 +1,7 @@
 import logging
 
 from discord import Bot, ApplicationContext
+from upstash_redis.asyncio import Redis
 
 logger = logging.getLogger("qadir")
 
@@ -13,10 +14,14 @@ class QadirBot(Bot):
 
         logger.info("⏳ Initializing...")
 
+        # Config
         if self.__config:
             logger.info("✅ Configuration loaded successfully.")
         else:
             raise ValueError("Configuration is empty!")
+
+        # Database
+        self.redis = Redis.from_env()
 
         super().__init__(*args, **options)
 
