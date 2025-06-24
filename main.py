@@ -12,7 +12,7 @@ from discord import Intents
 from core import QadirBot
 
 if __name__ == "__main__":
-    if os.getenv("ENV") == "production":
+    if os.getenv("PYTHON_ENV") == "production":
         with open("config.toml", "rb") as f:
             config = tomllib.load(f)
     else:

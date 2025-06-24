@@ -9,7 +9,7 @@ from core import QadirBot
 from modals import CreateProposalModal
 from datetime import datetime, timezone
 
-if os.getenv("ENV") == "production":
+if os.getenv("PYTHON_ENV") == "production":
     with open("config.toml", "rb") as f:
         config = tomllib.load(f)
 else:
