@@ -71,7 +71,6 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
         proposals = [json.loads(p) for p in proposals]
-
         if not proposals:
             logger.info("⌛ No proposals to process.")
             return
@@ -95,8 +94,8 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
                 await thread.send(embed=embed)
                 await thread.edit(locked=True)
-                await self.bot.redis.srem("qadir:proposals", json.dumps(data))
 
+                await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except discord.NotFound:
                 logger.warning(f"[TASK] Proposal {data['thread_id']} not found.")
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
