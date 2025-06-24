@@ -7,7 +7,7 @@ import re
 
 from core import QadirBot
 
-if os.getenv("ENV") == "production":
+if os.getenv("PYTHON_ENV") == "production":
     with open("config.toml", "rb") as f:
         config = tomllib.load(f)
 else:
