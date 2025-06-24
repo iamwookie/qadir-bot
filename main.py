@@ -12,10 +12,14 @@ from discord import Intents
 from core import QadirBot
 
 if __name__ == "__main__":
-    load_dotenv()
+    if os.getenv("ENV") == "production":
+        with open("config.toml", "rb") as f:
+            config = tomllib.load(f)
+    else:
+        load_dotenv(override=True)
 
-    with open("config.toml", "rb") as f:
-        config = tomllib.load(f)
+        with open("config.dev.toml", "rb") as f:
+            config = tomllib.load(f)
 
     logging.basicConfig(level=logging.DEBUG if config["app"]["debug"] else None)
 

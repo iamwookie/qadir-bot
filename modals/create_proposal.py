@@ -2,12 +2,17 @@ import tomllib
 import logging
 import discord
 import json
+import os
 import re
 
 from core import QadirBot
 
-with open("config.toml", "rb") as f:
-    config = tomllib.load(f)
+if os.getenv("ENV") == "production":
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+else:
+    with open("config.dev.toml", "rb") as f:
+        config = tomllib.load(f)
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 
@@ -25,11 +30,14 @@ class CreateProposalModal(discord.ui.Modal):
         self.add_item(discord.ui.InputText(label="Reasoning", style=discord.InputTextStyle.long, required=True))
         self.add_item(discord.ui.InputText(label="Expected Outcome", style=discord.InputTextStyle.long, required=True))
 
-    async def on_error(self, error: Exception) -> None:
+    async def on_error(self, _: discord.Interaction, error: Exception) -> None:
         logger.error("[MODAL] CreateProposalModal Error:", exc_info=error)
 
     def get_last_proposal_number(self, channel: discord.TextChannel) -> int | None:
         """Get the last proposal number from the channel threads."""
+
+        if not channel.threads:
+            return None
 
         last_thread = channel.threads[-1]
         match = re.search(r"#(\d+)", last_thread.name)

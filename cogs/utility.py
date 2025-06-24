@@ -33,7 +33,7 @@ class UtilityCog(commands.Cog):
     async def help(self, ctx: discord.ApplicationContext):
         """Stop it, get some help."""
 
-        embed = discord.Embed(title="Help", description="List of available commands:", colour=0xFFFFFF)
+        embed = discord.Embed(title="Help", description="Need some help? Gotchu.", colour=0xFFFFFF)
 
         for command in self.bot.application_commands:
             if isinstance(command, discord.SlashCommand):
