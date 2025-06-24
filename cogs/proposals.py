@@ -57,24 +57,6 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         except Exception:
             logger.exception("[COG] ProposalsCog Handler Error:")
 
-    @commands.Cog.listener()
-    async def on_ready(self) -> None:
-        """
-        On bot startup, re-check all active proposals for conflicting votes.
-        This handles missed `on_reaction_add` events.
-        """
-        logger.info("[BOT] Running vote integrity check on startup...")
-        proposals = await self.bot.redis.smembers("qadir:proposals")
-        proposals = [json.loads(p) for p in proposals]
-
-        for data in proposals:
-            try:
-                thread: discord.Thread = await self.bot.fetch_channel(data["thread_id"])
-                message: discord.Message = await thread.fetch_message(data["message_id"])
-                await self.cleanup_conflicting_votes(message)
-            except Exception:
-                logger.exception(f"[STARTUP] Cleanup failed for proposal {data['message_id']}")
-
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
         """
