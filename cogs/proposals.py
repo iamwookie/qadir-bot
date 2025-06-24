@@ -53,9 +53,9 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
             if isinstance(error, (commands.MissingRole, commands.MissingAnyRole)):
                 await ctx.respond("You do not have permission to use this command.", ephemeral=True)
             else:
-                logger.error("[COG] ProposalsCog Error:", exc_info=error)
+                logger.error("[COG] ProposalsCog error:", exc_info=error)
         except Exception:
-            logger.exception("[COG] ProposalsCog Handler Error:")
+            logger.exception("[COG] ProposalsCog handler error:")
 
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
@@ -85,11 +85,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                 upvotes: int = sum(r.count for r in message.reactions if r.emoji == "👍") - 1
                 downvotes: int = sum(r.count for r in message.reactions if r.emoji == "👎") - 1
 
-                embed = discord.Embed(
-                    title="Proposal Closed",
-                    description="Voting has ended for this proposal.",
-                    colour=0xFF0000
-                )
+                embed = discord.Embed(title="Proposal Closed", description="Voting has ended for this proposal.", colour=0xFF0000)
                 embed.add_field(name="Upvotes", value=f"`{upvotes}`", inline=True)
                 embed.add_field(name="Downvotes", value=f"`{downvotes}`", inline=True)
 
@@ -98,10 +94,10 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
 
             except discord.NotFound:
-                logger.warning(f"[TASK] Proposal {data['thread_id']} Not Found.")
+                logger.warning(f"[TASK] Proposal {data['thread_id']} not found.")
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except Exception:
-                logger.exception(f"[TASK] Error Processing Proposal {data['thread_id']}:")
+                logger.exception(f"[TASK] Error processing proposal {data['thread_id']}:")
 
         logger.info(f"⌛ Processed {len(proposals)} proposals.")
 
@@ -119,7 +115,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         :param error: The raised exception
         """
-        logger.error("[TASK] Proposals Processing Error:", exc_info=error)
+        logger.error("[TASK] Proposals processing error:", exc_info=error)
 
     @commands.slash_command()
     @commands.has_any_role(*ROLE_IDS)
@@ -162,7 +158,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
             await self.handle_vote_conflict(message, user, str(payload.emoji))
         except Exception:
-            logger.exception("[RAW] Failed to process raw reaction event")
+            logger.exception("[RAW] Failed to process raw reaction event:")
 
     async def handle_vote_conflict(self, message: discord.Message, user: discord.User, new_emoji: str) -> None:
         """
@@ -187,7 +183,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                 users = await r.users().flatten()
                 if any(u.id == user.id for u in users):
                     await r.remove(user)
-                    logger.info(f"Removed conflicting vote '{conflicting_emoji}' from {user.name} on {message.id}")
+                    logger.info(f"[VOTES] Removed conflicting vote '{conflicting_emoji}' from {user.name} on {message.id}.")
 
     async def cleanup_conflicting_votes(self, message: discord.Message) -> None:
         """
@@ -230,10 +226,9 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                         for u in users:
                             if u.id == user_id:
                                 await reaction.remove(u)
-                                logger.info(
-                                    f"[CLEANUP] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}")
+                                logger.info(f"[CLEANUP] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}.")
         except Exception:
-            logger.exception("[VOTING] Error cleaning up conflicting votes")
+            logger.exception("[VOTING] Error cleaning up conflicting votes:")
 
 
 def setup(bot: QadirBot) -> None:
