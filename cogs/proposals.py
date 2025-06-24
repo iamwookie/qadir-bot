@@ -34,6 +34,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         :param bot: The QadirBot instance
         """
+
         self.bot = bot
         self.process_proposals.start()
 
@@ -44,6 +45,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         :param ctx: The application context
         :return: True if user is authorized
         """
+
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
 
     async def cog_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
@@ -53,6 +55,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         :param ctx: The application context
         :param error: The raised exception
         """
+
         try:
             if isinstance(error, (commands.MissingRole, commands.MissingAnyRole)):
                 await ctx.respond("You do not have permission to use this command.", ephemeral=True)
@@ -67,6 +70,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         Process and finalize proposals that are over 24 hours old.
         Posts results and locks threads.
         """
+
         logger.info("⌛ Running proposals processing...")
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
@@ -110,6 +114,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         """
         Wait until the bot is ready before running the proposal loop.
         """
+
         await self.bot.wait_until_ready()
 
     @process_proposals.error
@@ -119,6 +124,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         :param error: The raised exception
         """
+
         logger.error("[TASK] Proposals processing error:", exc_info=error)
 
     @commands.slash_command()
@@ -129,6 +135,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         :param ctx: The application context
         """
+
         modal = CreateProposalModal(title="Create a Proposal")
 
         await ctx.send_modal(modal)
@@ -153,6 +160,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         :param payload: The raw reaction event
         """
+
         if payload.user_id == self.bot.user.id:
             return
 
@@ -173,6 +181,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         :param user: The user who reacted
         :param new_emoji: The emoji they just added
         """
+
         vote_emojis: dict[str, str] = {"👍": "👎", "👎": "👍"}
         conflicting_emoji: str | None = vote_emojis.get(new_emoji)
 
@@ -201,6 +210,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         :param message: The message containing the reactions
         """
+
         try:
             user_votes: dict[int, list[str]] = {}
             emoji_order: list[str] = []
@@ -224,6 +234,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
                 # Keep the last seen emoji from the defined order
                 emojis = set(votes)
+
                 for emoji in reversed(emoji_order):
                     if emoji in emojis:
                         keep_emoji = emoji
@@ -247,4 +258,5 @@ def setup(bot: QadirBot) -> None:
 
     :param bot: The QadirBot instance
     """
+
     bot.add_cog(ProposalsCog(bot))

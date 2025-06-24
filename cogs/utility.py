@@ -44,4 +44,10 @@ class UtilityCog(commands.Cog):
 
 
 def setup(bot: QadirBot):
+    """
+    Load the UtilityCog into the bot.
+
+    :param bot: The QadirBot instance
+    """
+
     bot.add_cog(UtilityCog(bot))
