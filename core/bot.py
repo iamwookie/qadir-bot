@@ -39,4 +39,4 @@ class QadirBot(Bot):
         logger.info(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
 
     async def on_application_command_error(self, _: ApplicationContext, exception: Exception) -> None:
-        logger.error("[BOT] Application Command Error:", exc_info=exception)
+        logger.error("[BOT] Application command error:", exc_info=exception)
