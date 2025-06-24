@@ -130,6 +130,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         :param ctx: The application context
         """
         modal = CreateProposalModal(title="Create a Proposal")
+
         await ctx.send_modal(modal)
 
     @commands.Cog.listener()
