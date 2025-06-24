@@ -2,6 +2,7 @@ import tomllib
 import logging
 import discord
 import json
+import re
 
 from discord.ext import commands, tasks
 from core import QadirBot
@@ -17,28 +18,37 @@ ROLE_IDS: list[int] = config["proposals"]["roles"]
 logger = logging.getLogger("qadir")
 
 
-# guild_ids is a part of command_attrs in CogMeta
 class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
-    """A cog for managing proposals."""
+    """
+    A cog to manage proposals and voting using 👍/👎 reactions.
+    Ensures users can only vote one way per proposal, and processes results after 24 hours.
+    """
 
-    def __init__(self, bot: QadirBot):
+    def __init__(self, bot: QadirBot) -> None:
+        """
+        Initialize the cog and start the proposal processing loop.
+
+        :param bot: The QadirBot instance
+        """
         self.bot = bot
-
-        # Tasks
         self.process_proposals.start()
 
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
-        """Check if the command is used by allowed roles."""
+        """
+        Restrict commands to users with allowed roles.
 
-        for role_id in ROLE_IDS:
-            if role_id in [role.id for role in ctx.author.roles]:
-                return True
-
-        return ctx.guild is not None and ctx.guild.id in GUILD_IDS
+        :param ctx: The application context
+        :return: True if user is authorized
+        """
+        return any(role.id in ROLE_IDS for role in ctx.author.roles)
 
     async def cog_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
-        """Handle command errors."""
+        """
+        Handle errors for commands in this cog.
 
+        :param ctx: The application context
+        :param error: The raised exception
+        """
         try:
             if isinstance(error, (commands.MissingRole, commands.MissingAnyRole)):
                 await ctx.respond("You do not have permission to use this command.", ephemeral=True)
@@ -47,14 +57,34 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         except Exception:
             logger.exception("[COG] ProposalsCog Handler Error:")
 
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        """
+        On bot startup, re-check all active proposals for conflicting votes.
+        This handles missed `on_reaction_add` events.
+        """
+        logger.info("[BOT] Running vote integrity check on startup...")
+        proposals = await self.bot.redis.smembers("qadir:proposals")
+        proposals = [json.loads(p) for p in proposals]
+
+        for data in proposals:
+            try:
+                thread: discord.Thread = await self.bot.fetch_channel(data["thread_id"])
+                message: discord.Message = await thread.fetch_message(data["message_id"])
+                await self.cleanup_conflicting_votes(message)
+            except Exception:
+                logger.exception(f"[STARTUP] Cleanup failed for proposal {data['message_id']}")
+
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
-        """Process active proposals."""
-
+        """
+        Process and finalize proposals that are over 24 hours old.
+        Posts results and locks threads.
+        """
         logger.info("⌛ Running proposals processing...")
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
-        proposals = [json.loads(data) for data in proposals]
+        proposals = [json.loads(p) for p in proposals]
 
         if not proposals:
             logger.info("⌛ No proposals to process.")
@@ -62,47 +92,172 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         for data in proposals:
             try:
-                thread = await self.bot.fetch_channel(data["thread_id"])
-                message = await thread.fetch_message(data["message_id"])
+                thread: discord.Thread = await self.bot.fetch_channel(data["thread_id"])
+                message: discord.Message = await thread.fetch_message(data["message_id"])
+
+                await self.cleanup_conflicting_votes(message)
 
                 if (datetime.now(timezone.utc) - message.created_at).total_seconds() < 86400:
                     continue
 
-                upvotes = sum(reaction.count for reaction in message.reactions if reaction.emoji == "👍") - 1
-                downvotes = sum(reaction.count for reaction in message.reactions if reaction.emoji == "👎") - 1
+                upvotes: int = sum(r.count for r in message.reactions if r.emoji == "👍") - 1
+                downvotes: int = sum(r.count for r in message.reactions if r.emoji == "👎") - 1
 
-                embed = discord.Embed(title="Proposal Closed", description="Voting has ended for this proposal.", colour=0xFF0000)
-                embed.add_field(name="Upvotes", value=f"`{str(upvotes)}`", inline=True)
-                embed.add_field(name="Downvotes", value=f"`{str(downvotes)}`", inline=True)
+                embed = discord.Embed(
+                    title="Proposal Closed",
+                    description="Voting has ended for this proposal.",
+                    colour=0xFF0000
+                )
+                embed.add_field(name="Upvotes", value=f"`{upvotes}`", inline=True)
+                embed.add_field(name="Downvotes", value=f"`{downvotes}`", inline=True)
 
                 await thread.send(embed=embed)
                 await thread.edit(locked=True)
-
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
+
             except discord.NotFound:
                 logger.warning(f"[TASK] Proposal {data['thread_id']} Not Found.")
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except Exception:
                 logger.exception(f"[TASK] Error Processing Proposal {data['thread_id']}:")
 
-        logger.info(f"⌛ Proccessed {len(proposals)} proposals.")
+        logger.info(f"⌛ Processed {len(proposals)} proposals.")
 
     @process_proposals.before_loop
     async def before_process_proposals(self) -> None:
+        """
+        Wait until the bot is ready before running the proposal loop.
+        """
         await self.bot.wait_until_ready()
 
     @process_proposals.error
     async def process_proposals_error(self, error: Exception) -> None:
+        """
+        Handle errors in the proposal loop.
+
+        :param error: The raised exception
+        """
         logger.error("[TASK] Proposals Processing Error:", exc_info=error)
 
     @commands.slash_command()
     @commands.has_any_role(*ROLE_IDS)
     async def propose(self, ctx: discord.ApplicationContext) -> None:
-        """Submit a proposal."""
+        """
+        Submit a proposal via a modal form.
 
+        :param ctx: The application context
+        """
         modal = CreateProposalModal(title="Create a Proposal")
         await ctx.send_modal(modal)
 
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User | discord.Member) -> None:
+        """
+        Fast, live handler for new reactions on cached messages.
 
-def setup(bot: QadirBot):
+        :param reaction: The added reaction
+        :param user: The reacting user
+        """
+        if user.bot:
+            return
+
+        await self.handle_vote_conflict(reaction.message, user, str(reaction.emoji))
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
+        """
+        Reliable fallback handler for all reactions, even on uncached messages.
+
+        :param payload: The raw reaction event
+        """
+        if payload.user_id == self.bot.user.id:
+            return
+
+        try:
+            channel: discord.abc.Messageable = await self.bot.fetch_channel(payload.channel_id)
+            message: discord.Message = await channel.fetch_message(payload.message_id)
+            user: discord.User = await self.bot.fetch_user(payload.user_id)
+
+            await self.handle_vote_conflict(message, user, str(payload.emoji))
+        except Exception:
+            logger.exception("[RAW] Failed to process raw reaction event")
+
+    async def handle_vote_conflict(self, message: discord.Message, user: discord.User, new_emoji: str) -> None:
+        """
+        Remove conflicting vote emoji if user has already voted oppositely.
+
+        :param message: The message the user reacted to
+        :param user: The user who reacted
+        :param new_emoji: The emoji they just added
+        """
+        vote_emojis: dict[str, str] = {"👍": "👎", "👎": "👍"}
+        conflicting_emoji: str | None = vote_emojis.get(new_emoji)
+        if conflicting_emoji is None:
+            return
+
+        tracked = await self.bot.redis.smembers("qadir:proposals")
+        tracked_ids = {int(json.loads(p)["message_id"]) for p in tracked}
+        if message.id not in tracked_ids:
+            return
+
+        for r in message.reactions:
+            if str(r.emoji) == conflicting_emoji:
+                users = await r.users().flatten()
+                if any(u.id == user.id for u in users):
+                    await r.remove(user)
+                    logger.info(f"Removed conflicting vote '{conflicting_emoji}' from {user.name} on {message.id}")
+
+    async def cleanup_conflicting_votes(self, message: discord.Message) -> None:
+        """
+        Remove older conflicting votes from users who reacted with both 👍 and 👎.
+
+        Keeps only the last emoji in message.reactions order (assumed latest).
+
+        :param message: The message containing the reactions
+        """
+        try:
+            user_votes: dict[int, list[str]] = {}
+            emoji_order: list[str] = []
+
+            for reaction in message.reactions:
+                if reaction.emoji not in {"👍", "👎"}:
+                    continue
+
+                emoji_order.append(reaction.emoji)
+                users = await reaction.users().flatten()
+
+                for u in users:
+                    if u.bot:
+                        continue
+                    user_votes.setdefault(u.id, []).append(reaction.emoji)
+
+            for user_id, votes in user_votes.items():
+                if len(set(votes)) <= 1:
+                    continue
+
+                # Keep the last seen emoji from the defined order
+                emojis = set(votes)
+                for emoji in reversed(emoji_order):
+                    if emoji in emojis:
+                        keep_emoji = emoji
+                        break
+
+                for reaction in message.reactions:
+                    if reaction.emoji in {"👍", "👎"} and reaction.emoji != keep_emoji:
+                        users = await reaction.users().flatten()
+                        for u in users:
+                            if u.id == user_id:
+                                await reaction.remove(u)
+                                logger.info(
+                                    f"[CLEANUP] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}")
+        except Exception:
+            logger.exception("[VOTING] Error cleaning up conflicting votes")
+
+
+def setup(bot: QadirBot) -> None:
+    """
+    Load the ProposalsCog into the bot.
+
+    :param bot: The QadirBot instance
+    """
     bot.add_cog(ProposalsCog(bot))
