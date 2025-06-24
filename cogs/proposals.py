@@ -71,6 +71,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
         proposals = [json.loads(p) for p in proposals]
+
         if not proposals:
             logger.info("⌛ No proposals to process.")
             return
@@ -173,17 +174,20 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         """
         vote_emojis: dict[str, str] = {"👍": "👎", "👎": "👍"}
         conflicting_emoji: str | None = vote_emojis.get(new_emoji)
+
         if conflicting_emoji is None:
             return
 
         tracked = await self.bot.redis.smembers("qadir:proposals")
         tracked_ids = {int(json.loads(p)["message_id"]) for p in tracked}
+
         if message.id not in tracked_ids:
             return
 
         for r in message.reactions:
             if str(r.emoji) == conflicting_emoji:
                 users = await r.users().flatten()
+
                 if any(u.id == user.id for u in users):
                     await r.remove(user)
                     logger.info(f"[VOTES] Removed conflicting vote '{conflicting_emoji}' from {user.name} on {message.id}.")
@@ -210,6 +214,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                 for u in users:
                     if u.bot:
                         continue
+
                     user_votes.setdefault(u.id, []).append(reaction.emoji)
 
             for user_id, votes in user_votes.items():
@@ -226,6 +231,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                 for reaction in message.reactions:
                     if reaction.emoji in {"👍", "👎"} and reaction.emoji != keep_emoji:
                         users = await reaction.users().flatten()
+
                         for u in users:
                             if u.id == user_id:
                                 await reaction.remove(u)
