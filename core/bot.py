@@ -27,7 +27,7 @@ class QadirBot(Bot):
 
     @property
     def config(self) -> dict:
-        """Configuration settings for the Bot."""
+        """Configuration settings for the application."""
         return self.__config
 
     async def on_ready(self) -> None:
@@ -36,7 +36,7 @@ class QadirBot(Bot):
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")
 
-        logger.info(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
+        logger.info(f"✅ Logged in as: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
 
     async def on_application_command_error(self, _: ApplicationContext, exception: Exception) -> None:
         logger.error("[BOT] Application Command Error:", exc_info=exception)

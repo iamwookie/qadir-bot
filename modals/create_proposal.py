@@ -25,11 +25,12 @@ class CreateProposalModal(discord.ui.Modal):
         self.add_item(discord.ui.InputText(label="Reasoning", style=discord.InputTextStyle.long, required=True))
         self.add_item(discord.ui.InputText(label="Expected Outcome", style=discord.InputTextStyle.long, required=True))
 
-    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+    async def on_error(self, _: discord.Interaction, error: Exception) -> None:
         logger.error("[MODAL] CreateProposalModal Error:", exc_info=error)
 
     def get_last_proposal_number(self, channel: discord.TextChannel) -> int | None:
         """Get the last proposal number from the channel threads."""
+
         if not channel.threads:
             return None
 
