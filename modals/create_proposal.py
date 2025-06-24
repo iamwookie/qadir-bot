@@ -2,12 +2,17 @@ import tomllib
 import logging
 import discord
 import json
+import os
 import re
 
 from core import QadirBot
 
-with open("config.toml", "rb") as f:
-    config = tomllib.load(f)
+if os.getenv("ENV") == "production":
+    with open("config.toml", "rb") as f:
+        config = tomllib.load(f)
+else:
+    with open("config.dev.toml", "rb") as f:
+        config = tomllib.load(f)
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 

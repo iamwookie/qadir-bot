@@ -1,0 +1,9 @@
+[app]
+name="Qadir DEV"
+debug=false
+version="1.0.0"
+
+[proposals]
+guilds=[ 1385917421843513395 ]
+channels=[ 1387009652868518043 ]
+roles=[ 1387009568193646744 ]
