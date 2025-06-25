@@ -1,12 +1,12 @@
-from dotenv import load_dotenv
-
-import sys
-import tomllib
 import logging
 import os
+import sys
+
+import tomllib
 
 # Discord
 from discord import Intents
+from dotenv import load_dotenv
 
 # Core
 from core import QadirBot

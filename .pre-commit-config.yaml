@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        language_version: python3
+        args: ["--quiet"]  # Suppress extra output
+
+  - repo: https://github.com/pre-commit/mirrors-isort
+    rev: v5.10.1
+    hooks:
+      - id: isort
+        language_version: python3
+        args: ["--profile", "black"]  # Matches Black style
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        language_version: python3
