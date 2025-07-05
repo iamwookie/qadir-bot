@@ -3,6 +3,8 @@ import logging
 from discord import ApplicationContext, Bot
 from upstash_redis.asyncio import Redis
 
+from config import config
+
 logger = logging.getLogger("qadir")
 
 
@@ -10,28 +12,15 @@ class QadirBot(Bot):
     """A custom Discord bot class for Qadir."""
 
     def __init__(self, *args, **options):
-        self.__config = options.pop("config", None)
-
         logger.info("⏳ Initializing...")
-
-        # Config
-        if self.__config:
-            logger.info("✅ Configuration loaded successfully.")
-        else:
-            raise ValueError("Configuration is empty!")
 
         # Database
         self.redis = Redis.from_env()
 
         super().__init__(*args, **options)
 
-    @property
-    def config(self) -> dict:
-        """Configuration settings for the application."""
-        return self.__config
-
     async def on_ready(self) -> None:
-        version = self.config.get("app").get("version")
+        version = config["app"]["version"]
 
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")

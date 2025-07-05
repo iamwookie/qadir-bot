@@ -1,21 +1,13 @@
 import json
 import logging
-import os
 from datetime import datetime, timezone
 
 import discord
-import tomllib
 from discord.ext import commands, tasks
 
+from config import config
 from core import QadirBot
 from modals import CreateProposalModal
-
-if os.getenv("PYTHON_ENV") == "production":
-    with open("config.toml", "rb") as f:
-        config = tomllib.load(f)
-else:
-    with open("config.dev.toml", "rb") as f:
-        config = tomllib.load(f)
 
 GUILD_IDS: list[int] = config["proposals"]["guilds"]
 ROLE_IDS: list[int] = config["proposals"]["roles"]

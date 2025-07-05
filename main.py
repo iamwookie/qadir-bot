@@ -2,25 +2,12 @@ import logging
 import os
 import sys
 
-import tomllib
-
-# Discord
 from discord import Intents
-from dotenv import load_dotenv
 
-# Core
+from config import config
 from core import QadirBot
 
 if __name__ == "__main__":
-    if os.getenv("PYTHON_ENV") == "production":
-        with open("config.toml", "rb") as f:
-            config = tomllib.load(f)
-    else:
-        load_dotenv(override=True)
-
-        with open("config.dev.toml", "rb") as f:
-            config = tomllib.load(f)
-
     logging.basicConfig(level=logging.DEBUG if config["app"]["debug"] else None)
 
     logger = logging.getLogger("qadir")
@@ -36,7 +23,7 @@ if __name__ == "__main__":
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
 
-    bot = QadirBot(intents=Intents.default(), config=config)
+    bot = QadirBot(intents=Intents.default())
 
     bot.load_extension("cogs.utility")
     bot.load_extension("cogs.proposals")
