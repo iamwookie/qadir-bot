@@ -5,7 +5,7 @@ import re
 import discord
 
 from config import config
-from core import QadirBot
+from core import Qadir
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 
@@ -24,7 +24,7 @@ class CreateProposalModal(discord.ui.Modal):
         self.add_item(discord.ui.InputText(label="Expected Outcome", style=discord.InputTextStyle.long, required=True))
 
     async def on_error(self, _: discord.Interaction, error: Exception) -> None:
-        logger.error("[MODAL] CreateProposalModal error:", exc_info=error)
+        logger.error("[MODAL] CreateProposalModal Error", exc_info=error)
 
     def get_last_proposal_number(self, channel: discord.TextChannel) -> int | None:
         """Get the last proposal number from the channel threads."""
@@ -62,7 +62,7 @@ class CreateProposalModal(discord.ui.Modal):
         await message.add_reaction("👍")
         await message.add_reaction("👎")
 
-        client: QadirBot = interaction.client
+        client: Qadir = interaction.client
 
         await client.redis.sadd("qadir:proposals", json.dumps({"thread_id": thread.id, "message_id": message.id}))
 

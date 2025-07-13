@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from core import QadirBot
+from core import Cog, Qadir
 from modals import CreateProposalModal
 
 GUILD_IDS: list[int] = config["proposals"]["guilds"]
@@ -15,20 +15,21 @@ ROLE_IDS: list[int] = config["proposals"]["roles"]
 logger = logging.getLogger("qadir")
 
 
-class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
+class ProposalsCog(Cog, guild_ids=GUILD_IDS):
     """
     A cog to manage proposals and voting using 👍/👎 reactions.
     Ensures users can only vote one way per proposal, and processes results after 24 hours.
     """
 
-    def __init__(self, bot: QadirBot) -> None:
+    def __init__(self, bot: Qadir) -> None:
         """
         Initialize the cog and start the proposal processing loop.
 
-        :param bot: The QadirBot instance
+        :param bot: The Qadir instance
         """
 
-        self.bot = bot
+        super().__init__(bot)
+
         self.process_proposals.start()
 
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
@@ -40,22 +41,6 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         """
 
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
-
-    async def cog_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
-        """
-        Handle errors for commands in this cog.
-
-        :param ctx: The application context
-        :param error: The raised exception
-        """
-
-        try:
-            if isinstance(error, (commands.MissingRole, commands.MissingAnyRole)):
-                await ctx.respond("You do not have permission to use this command.", ephemeral=True)
-            else:
-                logger.error("[COG] ProposalsCog error:", exc_info=error)
-        except Exception:
-            logger.exception("[COG] ProposalsCog handler error:")
 
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
@@ -95,10 +80,10 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except discord.NotFound:
-                logger.warning(f"[TASK] Proposal {data['thread_id']} not found.")
+                logger.warning(f"[TASK] Proposal {data['thread_id']} Not Found")
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except Exception:
-                logger.exception(f"[TASK] Error processing proposal {data['thread_id']}:")
+                logger.exception(f"[TASK] Error Processing Proposal {data['thread_id']}")
 
         logger.info(f"⌛ Processed {len(proposals)} proposals.")
 
@@ -118,9 +103,9 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
         :param error: The raised exception
         """
 
-        logger.error("[TASK] Proposals processing error:", exc_info=error)
+        logger.error("[TASK] Proposals Processing Error", exc_info=error)
 
-    @commands.slash_command()
+    @discord.slash_command()
     @commands.has_any_role(*ROLE_IDS)
     async def propose(self, ctx: discord.ApplicationContext) -> None:
         """
@@ -164,7 +149,7 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
 
             await self.handle_vote_conflict(message, user, str(payload.emoji))
         except Exception:
-            logger.exception("[RAW] Failed to process raw reaction event:")
+            logger.exception("[RAW] Failed To Process Raw Reaction Event")
 
     async def handle_vote_conflict(self, message: discord.Message, user: discord.User, new_emoji: str) -> None:
         """
@@ -242,14 +227,14 @@ class ProposalsCog(commands.Cog, guild_ids=GUILD_IDS):
                                 await reaction.remove(u)
                                 logger.info(f"[CLEANUP] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}.")
         except Exception:
-            logger.exception("[VOTING] Error cleaning up conflicting votes:")
+            logger.exception("[VOTING] Error Cleaning Up Conflicting Votes")
 
 
-def setup(bot: QadirBot) -> None:
+def setup(bot: Qadir) -> None:
     """
     Load the ProposalsCog into the bot.
 
-    :param bot: The QadirBot instance
+    :param bot: The Qadir instance
     """
 
     bot.add_cog(ProposalsCog(bot))

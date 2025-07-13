@@ -5,7 +5,7 @@ import sys
 from discord import Intents
 
 from config import config
-from core import QadirBot
+from core import Qadir
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG if config["app"]["debug"] else None)
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
 
-    bot = QadirBot(intents=Intents.default())
+    bot = Qadir(intents=Intents.default())
 
     bot.load_extension("cogs.utility")
     bot.load_extension("cogs.proposals")

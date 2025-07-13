@@ -1,7 +1,7 @@
-import tomllib
 import os
-
 from typing import TypedDict
+
+import tomllib
 from dotenv import load_dotenv
 
 
