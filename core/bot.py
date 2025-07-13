@@ -40,10 +40,10 @@ class Qadir(Bot):
 
         try:
             if isinstance(exception, (commands.MissingRole, commands.MissingAnyRole)):
-                embed = ErrorEmbed(description="You do not have permission to use this command.")
+                embed = ErrorEmbed(description="You do not have permission to use this command")
                 await ctx.respond(embed=embed, ephemeral=True)
             elif isinstance(exception, commands.CommandOnCooldown):
-                embed = ErrorEmbed(description=f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds.")
+                embed = ErrorEmbed(description=f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds")
                 await ctx.respond(embed=embed, ephemeral=True)
             else:
                 logger.error("[COG] Application Command Error", exc_info=exception)
