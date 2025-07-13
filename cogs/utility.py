@@ -57,10 +57,10 @@ class UtilityCog(Cog):
         try:
             user = await self.bot.get_or_fetch_user(int(user_id))
         except discord.NotFound:
-            await ctx.respond(embed=ErrorEmbed(title="User not found"), ephemeral=True)
+            await ctx.respond(embed=ErrorEmbed(description="User not found"), ephemeral=True)
             return
         except ValueError:
-            await ctx.respond(embed=ErrorEmbed(title="Invalid user ID provided"), ephemeral=True)
+            await ctx.respond(embed=ErrorEmbed(description="Invalid user ID provided"), ephemeral=True)
             return
 
         embed = discord.Embed(title="User Information", colour=0xFFFFFF)
