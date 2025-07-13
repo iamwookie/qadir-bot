@@ -3,6 +3,7 @@ import logging
 import discord
 from discord.ext import commands
 
+from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed
 
@@ -25,7 +26,7 @@ class UtilityCog(Cog):
         dev_id = 244662779745665026
 
         embed = discord.Embed(title="App Information", description=f"A magical application created by <@{dev_id}>", colour=0x00FF00)
-        embed.add_field(name="Version", value=f"`{self.bot.config['app']['version']}`")
+        embed.add_field(name="Version", value=f"`{config['app']['version']}`")
         embed.add_field(name="Latency", value=f"`{round(self.bot.latency * 100)} ms`")
         embed.add_field(name="Guilds", value=f"`{len(self.bot.guilds)}`", inline=False)
 
