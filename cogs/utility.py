@@ -66,8 +66,8 @@ class UtilityCog(Cog):
 
         embed = discord.Embed(title="User Information", colour=0xFFFFFF)
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.add_field(name="Username", value=f"`{user.name}#{user.discriminator}`")
-        embed.add_field(name="User ID", value=f"`{user.id}`")
+        embed.add_field(name="Name", value=f"`{str(user)}`", inline=False)
+        embed.add_field(name="User ID", value=f"`{user.id}`", inline=False)
         embed.add_field(name="Account Created", value=f"<t:{int(user.created_at.timestamp())}:R>", inline=False)
 
         if isinstance(ctx.guild, discord.Guild):
