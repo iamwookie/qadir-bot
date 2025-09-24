@@ -105,9 +105,11 @@ class ProposalsCog(Cog, guild_ids=GUILD_IDS):
 
         logger.error("[TASK] Proposals Processing Error", exc_info=error)
 
-    @discord.slash_command()
+    proposal = discord.SlashCommandGroup("proposal", "Create and manage Proposals")
+
+    @proposal.command()
     @commands.has_any_role(*ROLE_IDS)
-    async def propose(self, ctx: discord.ApplicationContext) -> None:
+    async def create(self, ctx: discord.ApplicationContext) -> None:
         """
         Submit a proposal via a modal form.
 

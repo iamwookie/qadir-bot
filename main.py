@@ -23,6 +23,8 @@ if __name__ == "__main__":
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
 
+    logger.info(f"🔧 Environment: {os.getenv('PYTHON_ENV', 'development').lower()}")
+
     bot = Qadir(intents=Intents.default())
 
     bot.load_extension("cogs.utility")
