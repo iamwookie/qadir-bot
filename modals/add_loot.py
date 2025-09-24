@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import discord
 
 from core import Qadir
+from core.embeds import SuccessEmbed, ErrorEmbed
 
 logger = logging.getLogger("qadir")
 
@@ -16,18 +17,17 @@ class AddLootModal(discord.ui.Modal):
         super().__init__(*args, **kwargs)
         self.event_thread_id = event_thread_id
 
-        self.add_item(discord.ui.InputText(
-            label="Item Name",
-            style=discord.InputTextStyle.short,
-            required=True,
-            placeholder="e.g., Dragon Sword, Gold Coins, Magic Potion"
-        ))
-        self.add_item(discord.ui.InputText(
-            label="Quantity",
-            style=discord.InputTextStyle.short,
-            required=True,
-            placeholder="e.g., 1, 50, 3"
-        ))
+        self.add_item(
+            discord.ui.InputText(
+                label="Item Name",
+                style=discord.InputTextStyle.short,
+                required=True,
+                placeholder="e.g., Dragon Sword, Gold Coins, Magic Potion",
+            )
+        )
+        self.add_item(
+            discord.ui.InputText(label="Quantity", style=discord.InputTextStyle.short, required=True, placeholder="e.g., 1, 50, 3")
+        )
 
     async def on_error(self, _: discord.Interaction, error: Exception) -> None:
         logger.error("[MODAL] AddLootModal Error", exc_info=error)
@@ -42,25 +42,22 @@ class AddLootModal(discord.ui.Modal):
         # Get event data from Redis
         event_data_raw = await client.redis.hget(f"qadir:event:{self.event_thread_id}", "data")
         if not event_data_raw:
-            await interaction.followup.send("❌ Event not found or has been deleted.", ephemeral=True)
+            embed = ErrorEmbed(description="Event not found or has been deleted.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         event_data = json.loads(event_data_raw)
 
         # Check if user is a participant
         if interaction.user.id not in event_data["participants"]:
-            await interaction.followup.send(
-                "❌ You must join the event first using `/join-event` before adding loot.",
-                ephemeral=True
-            )
+            embed = ErrorEmbed(description="You must join the event first using `/events join` before adding loot.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # Check if event is active
         if event_data["status"] != "active":
-            await interaction.followup.send(
-                f"❌ This event is {event_data['status']} and no longer accepts loot additions.",
-                ephemeral=True
-            )
+            embed = ErrorEmbed(description=f"This event is {event_data['status']} and no longer accepts loot additions.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         item_name = self.children[0].value.strip()
@@ -72,10 +69,8 @@ class AddLootModal(discord.ui.Modal):
             if quantity <= 0:
                 raise ValueError("Quantity must be positive")
         except ValueError:
-            await interaction.followup.send(
-                "❌ Invalid quantity. Please enter a positive number.",
-                ephemeral=True
-            )
+            embed = ErrorEmbed(description="Invalid quantity. Please enter a positive number.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # Add loot item
@@ -84,7 +79,7 @@ class AddLootModal(discord.ui.Modal):
             "name": item_name,
             "quantity": quantity,
             "added_by": interaction.user.id,
-            "added_at": datetime.now(timezone.utc).isoformat()
+            "added_at": datetime.now(timezone.utc).isoformat(),
         }
 
         event_data["loot_items"].append(loot_item)
@@ -105,7 +100,5 @@ class AddLootModal(discord.ui.Modal):
         except Exception:
             logger.exception(f"[LOOT] Failed to update event message for event {self.event_thread_id}")
 
-        await interaction.followup.send(
-            f"✅ Added **{quantity}x {item_name}** to the event loot!",
-            ephemeral=True
-        )
+        embed = SuccessEmbed(title="✅ Loot Added Successfully!", description=f"Added **{quantity}x {item_name}** to the event loot!")
+        await interaction.followup.send(embed=embed, ephemeral=True)

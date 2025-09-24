@@ -7,6 +7,7 @@ import discord
 
 from config import config
 from core import Qadir
+from core.embeds import SuccessEmbed, ErrorEmbed
 
 CHANNEL_ID: int = config["loot"]["channels"][0]
 
@@ -40,17 +41,13 @@ class CreateEventModal(discord.ui.Modal):
 
         event_name = self.children[0].value
         description = self.children[1].value
-        
+
         # Create thread for the event
         thread_title = f"🏆 {event_name}"
         thread = await channel.create_thread(name=thread_title, type=discord.ChannelType.public_thread)
 
         # Create event embed
-        event_embed = discord.Embed(
-            title=f"📅 Event: {event_name}",
-            description=description,
-            colour=0x00FF00
-        )
+        event_embed = SuccessEmbed(title=f"📅 Event: {event_name}", description=description)
         event_embed.add_field(name="Status", value="🟢 Active", inline=True)
         event_embed.add_field(name="Participants", value="1", inline=True)
         event_embed.add_field(name="Total Loot Items", value="0", inline=True)
@@ -66,7 +63,7 @@ class CreateEventModal(discord.ui.Modal):
                 "• Use `/event-summary` to see current totals\n"
                 "• Event creator can use `/finalize-event` to close and distribute loot"
             ),
-            colour=0x0099FF
+            colour=0x0099FF,
         )
 
         message = await thread.send(embeds=[event_embed, instructions_embed])
@@ -77,7 +74,7 @@ class CreateEventModal(discord.ui.Modal):
         thread_id_str = str(thread.id)
         message_id_str = str(message.id)
         user_id = interaction.user.id
-        
+
         event_data = {
             "thread_id": thread_id_str,
             "message_id": message_id_str,
@@ -87,21 +84,21 @@ class CreateEventModal(discord.ui.Modal):
             "status": EventStatus.ACTIVE.value,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "participants": [user_id],  # Creator is automatically a participant
-            "loot_items": []
+            "loot_items": [],
         }
 
         try:
             logger.info(f"[REDIS] Storing event data for thread {thread.id}")
             logger.info(f"[REDIS] Event data: {json.dumps(event_data, indent=2)}")
-            
+
             # Store event data
             await client.redis.hset(f"qadir:event:{thread_id_str}", "data", json.dumps(event_data))
             logger.info(f"[REDIS] Successfully stored event data for thread {thread_id_str}")
-            
+
             # Add to events set
             await client.redis.sadd("qadir:events", thread_id_str)
             logger.info(f"[REDIS] Successfully added thread {thread_id_str} to events set")
-            
+
             # Verify the data was stored
             stored_data = await client.redis.hget(f"qadir:event:{thread_id_str}", "data")
             if stored_data:
@@ -109,7 +106,7 @@ class CreateEventModal(discord.ui.Modal):
                 # Double-check the thread_id in the stored data matches
                 try:
                     verified_data = json.loads(stored_data)
-                    stored_thread_id = verified_data.get('thread_id')
+                    stored_thread_id = verified_data.get("thread_id")
                     if stored_thread_id == thread_id_str:
                         logger.info(f"[REDIS] Thread ID consistency verified: {stored_thread_id}")
                     else:
@@ -118,17 +115,18 @@ class CreateEventModal(discord.ui.Modal):
                     logger.error(f"[REDIS] Failed to verify stored data: {parse_error}")
             else:
                 logger.error(f"[REDIS] Verification FAILED: Could not retrieve stored data for thread {thread_id_str}")
-                
+
         except Exception as e:
             logger.error(f"[REDIS] Failed to store event data for thread {thread_id_str}: {e}")
-            await interaction.followup.send(
-                f"⚠️ Event **{event_name}** was created but there was an issue saving to database. Please contact an admin.",
-                ephemeral=True
+            embed = ErrorEmbed(
+                title="⚠️ Database Error",
+                description=f"Event **{event_name}** was created but there was an issue saving to database. Please contact an admin.",
             )
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        await interaction.followup.send(
-            f"✅ Event **{event_name}** has been created in {thread.mention}!\n"
-            f"You've been automatically added as a participant.",
-            ephemeral=True
+        embed = SuccessEmbed(
+            title="✅ Event Created Successfully!",
+            description=f"Event **{event_name}** has been created in {thread.mention}!\nYou've been automatically added as a participant.",
         )
+        await interaction.followup.send(embed=embed, ephemeral=True)
