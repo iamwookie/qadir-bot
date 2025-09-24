@@ -4,6 +4,10 @@ from typing import TypedDict
 import tomllib
 from dotenv import load_dotenv
 
+DISCORD_TOKEN: str = os.environ["DISCORD_TOKEN"]  # type: ignore
+UPSTASH_REDIS_REST_URL: str = os.environ["UPSTASH_REDIS_REST_URL"]  # type: ignore
+UPSTASH_REDIS_REST_TOKEN: str = os.environ["UPSTASH_REDIS_REST_TOKEN"]  # type: ignore
+
 
 class AppConfig(TypedDict):
     version: str
@@ -23,14 +27,13 @@ class Config(TypedDict):
 
 def load_config() -> Config:
     """Load the configuration from the appropriate TOML file based on the environment."""
-    if os.getenv("PYTHON_ENV") == "production":
-        with open("config.toml", "rb") as f:
-            return tomllib.load(f)
-    else:
-        load_dotenv(override=True)
 
-        with open("config.dev.toml", "rb") as f:
-            return tomllib.load(f)
+    load_dotenv(override=False)
+
+    path = "config.toml" if os.getenv("PYTHON_ENV") == "production" else "config.dev.toml"
+
+    with open(path, "rb") as f:
+        return tomllib.load(f)
 
 
 config: Config = load_config()

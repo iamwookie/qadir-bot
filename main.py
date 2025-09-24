@@ -4,7 +4,7 @@ import sys
 
 from discord import Intents
 
-from config import config
+from config import config, DISCORD_TOKEN
 from core import Qadir
 
 if __name__ == "__main__":
@@ -28,4 +28,4 @@ if __name__ == "__main__":
     bot.load_extension("cogs.utility")
     bot.load_extension("cogs.proposals")
 
-    bot.run(os.getenv("DISCORD_TOKEN"))
+    bot.run(DISCORD_TOKEN)
