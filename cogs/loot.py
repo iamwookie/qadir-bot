@@ -279,7 +279,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         if ctx.channel_id not in CHANNEL_IDS:
             allowed_channels = [f"<#{channel_id}>" for channel_id in CHANNEL_IDS]
             embed = ErrorEmbed(description=f"This command can only be used in: {', '.join(allowed_channels)}")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         modal = CreateEventModal(title="Create Loot Event")
@@ -306,7 +306,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                     f"Use `/events create` in <#{CHANNEL_IDS[0]}>"
                 ),
             )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Filter events user can join (not already a member of)
@@ -320,7 +320,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             embed = SuccessEmbed(
                 title="✅ Already in All Events!", description=f"You're already participating in all active events:\n\n{event_list}"
             )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Show event selection
@@ -352,7 +352,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                     f"**Create events in:** <#{CHANNEL_IDS[0]}>"
                 ),
             )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Show event selection for adding loot
@@ -375,7 +375,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
         if not all_events:
             embed = ErrorEmbed(title="❌ No Active Events", description="There are no active events to view summaries for.")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # If user is only in one event, show it directly
@@ -477,11 +477,15 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         Finalize the current event, lock the thread, and show final loot distribution.
         Only the event creator can use this command.
         """
+        
+        # Defer immediately to prevent timeout
+        await ctx.defer(ephemeral=True)
+        logger.info(f"[FINALIZE] Command started by user {ctx.author.id} in channel {ctx.channel.id}")
 
         # Check if this is an event thread
         if not isinstance(ctx.channel, discord.Thread):
             embed = ErrorEmbed(description="This command can only be used in event threads.")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         thread_id = ctx.channel.id
@@ -489,7 +493,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
         if not event_data_raw:
             embed = ErrorEmbed(description="This thread is not associated with an active event.")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         event_data = json.loads(event_data_raw)
@@ -507,7 +511,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 title="❌ Permission Denied",
                 description=f"Only the event creator can finalize the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>"
             )
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             logger.info(f"[FINALIZE] Permission denied message sent, returning early")
             return
         
@@ -516,7 +520,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         # Check if event is already finalized
         if event_data["status"] != "active":
             embed = ErrorEmbed(description=f"This event is already {event_data['status']}.")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Update event status
@@ -654,6 +658,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
         # Lock the thread
         await ctx.channel.edit(locked=True)
+        logger.info(f"[FINALIZE] Successfully finalized event and locked thread {ctx.channel.id}")
 
     @event.command(description="Show all events you've created or joined")
     async def list(self, ctx: discord.ApplicationContext) -> None:
@@ -960,13 +965,13 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             embed.add_field(name="Events Kept", value=str(kept_count), inline=True)
             embed.add_field(name="Events Cleaned", value=str(cleaned_count), inline=True)
 
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
             logger.info(f"[CLEANUP] Completed: kept={kept_count}, cleaned={cleaned_count}")
 
         except Exception as e:
             logger.error(f"[CLEANUP] Error during cleanup: {e}")
             embed = discord.Embed(title="❌ Cleanup Failed", description=f"An error occurred during cleanup: {e}", colour=0xFF0000)
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=embed, ephemeral=True)
 
 
 
