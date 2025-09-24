@@ -60,25 +60,27 @@ class EventSelect(discord.ui.Select):
         self.disabled_values = disabled_values or []
 
     async def callback(self, interaction: discord.Interaction):
-        # Acknowledge the interaction immediately to prevent timeout
-        await interaction.response.defer(ephemeral=True)
-        
         selected_thread_id = int(self.values[0])
 
         # Disable already joined events for join action
         if self.action == "join" and str(selected_thread_id) in self.disabled_values:
-            await interaction.followup.send("❌ You're already a member of this event!", ephemeral=True)
+            await interaction.response.send_message("❌ You're already a member of this event!", ephemeral=True)
             return
 
         # Get the loot cog instance
         loot_cog = interaction.client.get_cog("LootCog")
 
-        if self.action == "join":
-            await loot_cog._handle_join_event(interaction, selected_thread_id)
-        elif self.action == "add_loot":
+        # Handle add_loot differently since it needs to send a modal (can't defer first)
+        if self.action == "add_loot":
             await loot_cog._handle_add_loot(interaction, selected_thread_id)
-        elif self.action == "summary":
-            await loot_cog._handle_event_summary(interaction, selected_thread_id)
+        else:
+            # For other actions, defer first to prevent timeout
+            await interaction.response.defer(ephemeral=True)
+            
+            if self.action == "join":
+                await loot_cog._handle_join_event(interaction, selected_thread_id)
+            elif self.action == "summary":
+                await loot_cog._handle_event_summary(interaction, selected_thread_id)
 
 
 class LootCog(Cog, guild_ids=GUILD_IDS):
@@ -249,14 +251,14 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         """Handle adding loot via dropdown selection."""
         event_data_raw = await self.bot.redis.hget(f"qadir:event:{thread_id}", "data")
         if not event_data_raw:
-            await interaction.followup.send("❌ Event not found.", ephemeral=True)
+            await interaction.response.send_message("❌ Event not found.", ephemeral=True)
             return
 
         event_data = json.loads(event_data_raw)
 
         # Check if user is a participant
         if interaction.user.id not in event_data["participants"]:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 f"❌ You must join **{event_data['name']}** first before adding loot.\n" f"Use `/join-event` to join this event.",
                 ephemeral=True,
             )
