@@ -46,17 +46,8 @@ class CreateEventModal(discord.ui.Modal):
         thread_title = f"🏆 {event_name}"
         thread = await channel.create_thread(name=thread_title, type=discord.ChannelType.public_thread)
 
-<<<<<<< HEAD
         # Create event embed
         event_embed = SuccessEmbed(title=f"📅 Event: {event_name}", description=description)
-=======
-        # Create event embed with detailed breakdown
-        event_embed = discord.Embed(
-            title=f"📅 Event: {event_name}",
-            description=description or "No description provided",
-            colour=0x00FF00
-        )
->>>>>>> 0e9ba82 (fix finalization)
         event_embed.add_field(name="Status", value="🟢 Active", inline=True)
         event_embed.add_field(name="Participants", value="1", inline=True)
         event_embed.add_field(name="Total Items", value="0", inline=True)

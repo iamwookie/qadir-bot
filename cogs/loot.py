@@ -60,11 +60,14 @@ class EventSelect(discord.ui.Select):
         self.disabled_values = disabled_values or []
 
     async def callback(self, interaction: discord.Interaction):
+        # Acknowledge the interaction immediately to prevent timeout
+        await interaction.response.defer(ephemeral=True)
+        
         selected_thread_id = int(self.values[0])
 
         # Disable already joined events for join action
         if self.action == "join" and str(selected_thread_id) in self.disabled_values:
-            await interaction.response.send_message("❌ You're already a member of this event!", ephemeral=True)
+            await interaction.followup.send("❌ You're already a member of this event!", ephemeral=True)
             return
 
         # Get the loot cog instance
@@ -219,14 +222,14 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         """Handle joining an event via dropdown selection."""
         event_data_raw = await self.bot.redis.hget(f"qadir:event:{thread_id}", "data")
         if not event_data_raw:
-            await interaction.response.send_message("❌ Event not found.", ephemeral=True)
+            await interaction.followup.send("❌ Event not found.", ephemeral=True)
             return
 
         event_data = json.loads(event_data_raw)
 
         # Check if user is already a participant
         if interaction.user.id in event_data["participants"]:
-            await interaction.response.send_message("✅ You're already participating in this event!", ephemeral=True)
+            await interaction.followup.send("✅ You're already participating in this event!", ephemeral=True)
             return
 
         # Add user to participants
@@ -238,7 +241,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         # Update the event card with new participant
         await self._update_event_card(event_data)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"🎉 Successfully joined **{event_data['name']}**!\n" f"You can now add loot items to this event.", ephemeral=True
         )
 
@@ -246,14 +249,14 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         """Handle adding loot via dropdown selection."""
         event_data_raw = await self.bot.redis.hget(f"qadir:event:{thread_id}", "data")
         if not event_data_raw:
-            await interaction.response.send_message("❌ Event not found.", ephemeral=True)
+            await interaction.followup.send("❌ Event not found.", ephemeral=True)
             return
 
         event_data = json.loads(event_data_raw)
 
         # Check if user is a participant
         if interaction.user.id not in event_data["participants"]:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"❌ You must join **{event_data['name']}** first before adding loot.\n" f"Use `/join-event` to join this event.",
                 ephemeral=True,
             )
@@ -390,10 +393,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         """Handle showing event summary via dropdown selection."""
         event_data_raw = await self.bot.redis.hget(f"qadir:event:{thread_id}", "data")
         if not event_data_raw:
-            if hasattr(interaction, "response"):
-                await interaction.response.send_message("❌ Event not found.", ephemeral=True)
-            else:
-                await interaction.respond("❌ Event not found.", ephemeral=True)
+            await interaction.followup.send("❌ Event not found.", ephemeral=True)
             return
 
         event_data = json.loads(event_data_raw)
@@ -469,10 +469,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         created_at = datetime.fromisoformat(event_data["created_at"].replace("Z", "+00:00"))
         embed.timestamp = created_at
 
-        if hasattr(interaction, "response"):
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        else:
-            await interaction.respond(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @event.command(description="Close and finalize event with final distribution (event creator only)")
     async def finalize(self, ctx: discord.ApplicationContext) -> None:
@@ -502,14 +499,19 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         current_user_id = ctx.author.id
         
         logger.info(f"[FINALIZE] Permission check: creator_id={creator_id} (type: {type(creator_id)}), current_user_id={current_user_id} (type: {type(current_user_id)})")
+        logger.info(f"[FINALIZE] Comparison result: {current_user_id != creator_id}")
         
         if current_user_id != creator_id:
+            logger.warning(f"[FINALIZE] Permission denied - user {current_user_id} is not creator {creator_id}")
             embed = ErrorEmbed(
                 title="❌ Permission Denied",
                 description=f"Only the event creator can finalize the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>"
             )
             await ctx.respond(embed=embed, ephemeral=True)
+            logger.info(f"[FINALIZE] Permission denied message sent, returning early")
             return
+        
+        logger.info(f"[FINALIZE] Permission check passed - user {current_user_id} is the creator")
 
         # Check if event is already finalized
         if event_data["status"] != "active":
