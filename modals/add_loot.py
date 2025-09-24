@@ -87,18 +87,10 @@ class AddLootModal(discord.ui.Modal):
         # Update Redis
         await client.redis.hset(f"qadir:event:{self.event_thread_id}", "data", json.dumps(event_data))
 
-        # Update the event message
-        try:
-            thread: discord.Thread = await client.fetch_channel(self.event_thread_id)
-            message: discord.Message = await thread.fetch_message(event_data["message_id"])
-
-            # Update the embed
-            embed = message.embeds[0]
-            embed.set_field_at(2, name="Total Loot Items", value=str(len(event_data["loot_items"])), inline=True)
-
-            await message.edit(embeds=message.embeds)
-        except Exception:
-            logger.exception(f"[LOOT] Failed to update event message for event {self.event_thread_id}")
+        # Update the event card with new loot
+        loot_cog = client.get_cog("LootCog")
+        if loot_cog:
+            await loot_cog._update_event_card(event_data)
 
         embed = SuccessEmbed(title="✅ Loot Added Successfully!", description=f"Added **{quantity}x {item_name}** to the event loot!")
         await interaction.followup.send(embed=embed, ephemeral=True)

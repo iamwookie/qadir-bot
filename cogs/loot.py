@@ -100,6 +100,79 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
         return user_events
 
+    async def _update_event_card(self, event_data: dict) -> None:
+        """Update the event card with current loot breakdown and distribution."""
+        try:
+            thread_id = int(event_data['thread_id'])
+            message_id = int(event_data['message_id'])
+            
+            thread = await self.bot.fetch_channel(thread_id)
+            message = await thread.fetch_message(message_id)
+            
+            # Get the original embed
+            event_embed = message.embeds[0].copy()
+            
+            # Update basic stats
+            participant_count = len(event_data['participants'])
+            total_items = len(event_data['loot_items'])
+            
+            # Update the basic fields (Status, Participants, Total Items)
+            event_embed.set_field_at(0, name="Status", value="🟢 Active" if event_data['status'] == 'active' else "🔴 Completed", inline=True)
+            event_embed.set_field_at(1, name="Participants", value=str(participant_count), inline=True)
+            event_embed.set_field_at(2, name="Total Items", value=str(total_items), inline=True)
+            
+            # Calculate loot breakdown and distribution
+            if event_data['loot_items']:
+                from collections import defaultdict
+                
+                # Group loot by type and by contributor
+                loot_summary = defaultdict(int)
+                loot_by_user = defaultdict(list)
+                
+                for item in event_data['loot_items']:
+                    loot_summary[item['name']] += item['quantity']
+                    try:
+                        user = await self.bot.fetch_user(item['added_by'])
+                        username = user.display_name
+                    except:
+                        username = f"User {item['added_by']}"
+                    loot_by_user[username].append(f"{item['quantity']}x {item['name']}")
+                
+                # Create loot breakdown text
+                breakdown_lines = []
+                for username, items in sorted(loot_by_user.items()):
+                    breakdown_lines.append(f"**{username}**: {', '.join(items)}")
+                
+                breakdown_text = "\n".join(breakdown_lines) if breakdown_lines else "No contributions yet"
+                
+                # Create distribution preview
+                distribution_lines = []
+                for item_name, total_quantity in sorted(loot_summary.items()):
+                    per_person = total_quantity // participant_count
+                    remainder = total_quantity % participant_count
+                    
+                    if remainder > 0:
+                        distribution_lines.append(f"**{total_quantity}x {item_name}** → {per_person} each + {remainder} extra")
+                    else:
+                        distribution_lines.append(f"**{total_quantity}x {item_name}** → {per_person} each")
+                
+                distribution_text = "\n".join(distribution_lines) if distribution_lines else "No items to distribute"
+                
+                # Update the embed fields
+                event_embed.set_field_at(3, name="🎁 Current Loot Breakdown", value=breakdown_text[:1024], inline=False)  # Discord field limit
+                event_embed.set_field_at(4, name="⚖️ Distribution Preview", value=distribution_text[:1024], inline=False)
+            else:
+                # No loot yet
+                event_embed.set_field_at(3, name="🎁 Current Loot Breakdown", value="*No loot added yet - use `/events add-loot` to contribute!*", inline=False)
+                event_embed.set_field_at(4, name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added*", inline=False)
+            
+            # Update the message
+            await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
+            logger.info(f"[EVENT-CARD] Successfully updated event card for {event_data['name']}")
+            
+        except Exception as e:
+            logger.error(f"[EVENT-CARD] Failed to update event card: {e}")
+
     async def _get_all_active_events(self) -> list:
         """Get all active events."""
         try:
@@ -162,15 +235,8 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         # Update Redis
         await self.bot.redis.hset(f"qadir:event:{thread_id}", "data", json.dumps(event_data))
 
-        # Update the event message
-        try:
-            thread = await self.bot.fetch_channel(thread_id)
-            message = await thread.fetch_message(event_data["message_id"])
-            embed = message.embeds[0]
-            embed.set_field_at(1, name="Participants", value=str(len(event_data["participants"])), inline=True)
-            await message.edit(embeds=message.embeds)
-        except Exception:
-            logger.exception(f"[LOOT] Failed to update event message for event {thread_id}")
+        # Update the event card with new participant
+        await self._update_event_card(event_data)
 
         await interaction.response.send_message(
             f"🎉 Successfully joined **{event_data['name']}**!\n" f"You can now add loot items to this event.", ephemeral=True
@@ -432,8 +498,16 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         event_data = json.loads(event_data_raw)
 
         # Check if user is the event creator
-        if ctx.author.id != event_data["creator_id"]:
-            embed = ErrorEmbed(description="Only the event creator can finalize the event.")
+        creator_id = event_data['creator_id']
+        current_user_id = ctx.author.id
+        
+        logger.info(f"[FINALIZE] Permission check: creator_id={creator_id} (type: {type(creator_id)}), current_user_id={current_user_id} (type: {type(current_user_id)})")
+        
+        if current_user_id != creator_id:
+            embed = ErrorEmbed(
+                title="❌ Permission Denied",
+                description=f"Only the event creator can finalize the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>"
+            )
             await ctx.respond(embed=embed, ephemeral=True)
             return
 
@@ -460,29 +534,119 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         except Exception:
             logger.exception(f"[LOOT] Failed to update event message for event {thread_id}")
 
-        # Create final summary
-        if event_data["loot_items"]:
+        # Create dramatic finalization announcement
+        if event_data['loot_items']:
+            # Calculate final totals
             loot_summary = defaultdict(int)
-            for item in event_data["loot_items"]:
-                loot_summary[item["name"]] += item["quantity"]
+            loot_by_user = defaultdict(list)
+            
+            for item in event_data['loot_items']:
+                loot_summary[item['name']] += item['quantity']
+                try:
+                    user = await self.bot.fetch_user(item['added_by'])
+                    username = user.display_name
+                    user_mention = user.mention
+                except:
+                    username = f"User {item['added_by']}"
+                    user_mention = f"<@{item['added_by']}>"
+                loot_by_user[user_mention].append(f"{item['quantity']}x {item['name']}")
 
-            final_embed = discord.Embed(title="🏁 Event Finalized!", description="Here's the final loot distribution:", colour=0xFF0000)
+            # Create the main announcement embed
+            final_embed = discord.Embed(
+                title=f"🏁 EVENT FINALIZED: {event_data['name']}",
+                description="The adventure has concluded! Here's what everyone contributed and earned:",
+                colour=0xFFD700  # Gold color for dramatic effect
+            )
 
-            distribution_text = []
+            # Add contributions section with mentions
+            if loot_by_user:
+                contribution_lines = []
+                for user_mention, items in sorted(loot_by_user.items()):
+                    contribution_lines.append(f"{user_mention} contributed: **{', '.join(items)}**")
+                
+                final_embed.add_field(
+                    name="🎒 Individual Contributions",
+                    value="\n".join(contribution_lines),
+                    inline=False
+                )
+
+            # Add distribution section with mentions for who gets what
+            participant_mentions = []
+            for participant_id in event_data['participants']:
+                try:
+                    user = await self.bot.fetch_user(participant_id)
+                    participant_mentions.append(user.mention)
+                except:
+                    participant_mentions.append(f"<@{participant_id}>")
+
+            distribution_lines = []
+            individual_shares = []
+            
             for item_name, total_quantity in sorted(loot_summary.items()):
-                per_person = total_quantity // len(event_data["participants"])
-                remainder = total_quantity % len(event_data["participants"])
+                per_person = total_quantity // len(event_data['participants'])
+                remainder = total_quantity % len(event_data['participants'])
+                
+                if per_person > 0:
+                    if remainder > 0:
+                        distribution_lines.append(f"**{total_quantity}x {item_name}** → {per_person} each + {remainder} extra")
+                        individual_shares.append(f"• **{per_person}x {item_name}** each")
+                    else:
+                        distribution_lines.append(f"**{total_quantity}x {item_name}** → {per_person} each")
+                        individual_shares.append(f"• **{per_person}x {item_name}** each")
 
-                if remainder > 0:
-                    distribution_text.append(f"**{total_quantity}x {item_name}**\n└ {per_person} per person + {remainder} extra")
-                else:
-                    distribution_text.append(f"**{total_quantity}x {item_name}**\n└ {per_person} per person")
+            final_embed.add_field(
+                name="⚖️ Final Distribution Breakdown",
+                value="\n".join(distribution_lines),
+                inline=False
+            )
 
-            final_embed.add_field(name="🎁 Final Distribution", value="\n\n".join(distribution_text), inline=False)
+            # Add what each person gets
+            if individual_shares:
+                share_text = f"Each participant ({', '.join(participant_mentions)}) receives:\n" + "\n".join(individual_shares)
+                final_embed.add_field(
+                    name="🎁 Your Share",
+                    value=share_text,
+                    inline=False
+                )
 
             final_embed.set_footer(text="Event has been locked. No more changes can be made.")
+            final_embed.timestamp = datetime.now(timezone.utc)
 
+            # Send to the thread
             await ctx.respond(embed=final_embed, ephemeral=False)
+            
+            # Also send a summary to the main channel
+            try:
+                main_channel = await self.bot.fetch_channel(CHANNEL_IDS[0])
+                summary_embed = discord.Embed(
+                    title=f"📢 Event Completed: {event_data['name']}",
+                    description=f"Event has been finalized with {len(event_data['participants'])} participants and {len(event_data['loot_items'])} items!",
+                    colour=0x00FF00
+                )
+                summary_embed.add_field(
+                    name="Participants",
+                    value=", ".join(participant_mentions),
+                    inline=False
+                )
+                
+                # Add top contributors
+                if loot_by_user:
+                    top_contributors = sorted(loot_by_user.items(), key=lambda x: len(x[1]), reverse=True)[:3]
+                    contributor_text = []
+                    for user_mention, items in top_contributors:
+                        contributor_text.append(f"{user_mention}: {len(items)} items")
+                    summary_embed.add_field(
+                        name="Top Contributors",
+                        value="\n".join(contributor_text),
+                        inline=True
+                    )
+                
+                await main_channel.send(embed=summary_embed)
+                logger.info(f"[FINALIZE] Sent completion announcement to main channel for {event_data['name']}")
+                
+            except Exception as e:
+                logger.error(f"[FINALIZE] Failed to send main channel announcement: {e}")
+                
         else:
             await ctx.respond("🏁 Event finalized! No loot was collected during this event.", ephemeral=False)
 
@@ -801,6 +965,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             logger.error(f"[CLEANUP] Error during cleanup: {e}")
             embed = discord.Embed(title="❌ Cleanup Failed", description=f"An error occurred during cleanup: {e}", colour=0xFF0000)
             await ctx.respond(embed=embed, ephemeral=True)
+
 
 
 def setup(bot: Qadir) -> None:
