@@ -36,14 +36,54 @@ class UtilityCog(Cog):
     async def help(self, ctx: discord.ApplicationContext):
         """Stop it, get some help"""
 
+        await ctx.defer(ephemeral=True)
+
         embed = discord.Embed(title="Help", description="Need some help? Gotchu", colour=0xFFFFFF)
+
+        # Group commands by type for better organization
+        utility_commands = []
+        event_commands = []
+        other_commands = []
 
         for command in self.bot.application_commands:
             if isinstance(command, discord.SlashCommand):
                 if not command.guild_ids or (ctx.guild and ctx.guild.id in command.guild_ids):
-                    embed.add_field(name=f"/{command.name}", value=command.description or "No description provided", inline=False)
+                    command_name = f"/{command.name}"
+                    command_desc = command.description or "No description provided"
+                    
+                    if command.name in ["ping", "info", "help", "find"]:
+                        utility_commands.append((command_name, command_desc))
+                    elif command.name == "events":
+                        # Handle slash command groups differently
+                        event_commands.append((command_name, "Manage loot tracking events"))
+                    else:
+                        other_commands.append((command_name, command_desc))
+            elif isinstance(command, discord.SlashCommandGroup):
+                if command.name == "events":
+                    # Add sub-commands for the events group
+                    event_commands.append(("/events create", "Create a new loot tracking event"))
+                    event_commands.append(("/events join", "Join an active event"))
+                    event_commands.append(("/events add-loot", "Add loot items to an event"))
+                    event_commands.append(("/events summary", "View event summary"))
+                    event_commands.append(("/events list", "Show your events"))
+                    event_commands.append(("/events status", "Check your status"))
 
-        await ctx.respond(embed=embed, ephemeral=True)
+        # Add commands to embed in organized sections
+        if utility_commands:
+            for name, desc in utility_commands:
+                embed.add_field(name=name, value=desc, inline=False)
+
+        if event_commands:
+            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**🏆 Loot Tracking Events**", inline=False)
+            for name, desc in event_commands:
+                embed.add_field(name=name, value=desc, inline=False)
+
+        if other_commands:
+            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**🔧 Other Commands**", inline=False)
+            for name, desc in other_commands:
+                embed.add_field(name=name, value=desc, inline=False)
+
+        await ctx.followup.send(embed=embed, ephemeral=True)
 
     @discord.slash_command()
     @discord.option("user_id", str, description="A user to find by ID")

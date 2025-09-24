@@ -27,5 +27,6 @@ if __name__ == "__main__":
 
     bot.load_extension("cogs.utility")
     bot.load_extension("cogs.proposals")
+    bot.load_extension("cogs.loot")
 
     bot.run(os.getenv("DISCORD_TOKEN"))

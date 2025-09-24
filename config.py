@@ -16,9 +16,15 @@ class ProposalsConfig(TypedDict):
     roles: list[int]
 
 
+class LootConfig(TypedDict):
+    guilds: list[int]
+    channels: list[int]
+
+
 class Config(TypedDict):
     app: AppConfig
     proposals: ProposalsConfig
+    loot: LootConfig
 
 
 def load_config() -> Config:
