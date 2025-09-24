@@ -111,7 +111,12 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             thread_id = int(event_data['thread_id'])
             message_id = int(event_data['message_id'])
             
-            thread = await self.bot.fetch_channel(thread_id)
+            # Use get_channel instead of fetch_channel for cached access
+            thread = self.bot.get_channel(thread_id)
+            if not thread:
+                thread = await self.bot.fetch_channel(thread_id)
+            
+            # Fetch message (this is unavoidable but only one API call)
             message = await thread.fetch_message(message_id)
             
             # Get the original embed
@@ -134,13 +139,27 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 loot_summary = defaultdict(int)
                 loot_by_user = defaultdict(list)
                 
+                # Batch collect all unique user IDs to minimize API calls
+                unique_user_ids = set()
+                for item in event_data['loot_items']:
+                    unique_user_ids.add(item['added_by'])
+                
+                # Create user cache for this operation
+                user_cache = {}
+                for user_id in unique_user_ids:
+                    try:
+                        # Try to get from cache first
+                        user = self.bot.get_user(user_id)
+                        if not user:
+                            user = await self.bot.fetch_user(user_id)
+                        user_cache[user_id] = user.display_name
+                    except:
+                        user_cache[user_id] = f"User {user_id}"
+                
+                # Now process loot items using cached user data
                 for item in event_data['loot_items']:
                     loot_summary[item['name']] += item['quantity']
-                    try:
-                        user = await self.bot.fetch_user(item['added_by'])
-                        username = user.display_name
-                    except:
-                        username = f"User {item['added_by']}"
+                    username = user_cache[item['added_by']]
                     loot_by_user[username].append(f"{item['quantity']}x {item['name']}")
                 
                 # Create loot breakdown text
@@ -413,15 +432,25 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         embed.add_field(name="Participants", value=str(len(event_data["participants"])), inline=True)
         embed.add_field(name="Total Items", value=str(len(event_data["loot_items"])), inline=True)
 
-        # Participants list
-        participants = []
-        for participant_id in event_data["participants"]:
+        # Collect all unique user IDs first (participants + loot contributors)
+        all_user_ids = set(event_data["participants"])
+        if event_data["loot_items"]:
+            for item in event_data["loot_items"]:
+                all_user_ids.add(item["added_by"])
+        
+        # Batch fetch all users at once
+        user_cache = {}
+        for user_id in all_user_ids:
             try:
-                user = await self.bot.fetch_user(participant_id)
-                participants.append(user.display_name)
+                user = self.bot.get_user(user_id)
+                if not user:
+                    user = await self.bot.fetch_user(user_id)
+                user_cache[user_id] = user.display_name
             except:
-                participants.append(f"User {participant_id}")
+                user_cache[user_id] = f"User {user_id}"
 
+        # Participants list using cached data
+        participants = [user_cache[participant_id] for participant_id in event_data["participants"]]
         embed.add_field(name="👥 Participants", value=", ".join(participants) if participants else "None", inline=False)
 
         # Loot items grouped by type
@@ -431,11 +460,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
             for item in event_data["loot_items"]:
                 loot_summary[item["name"]] += item["quantity"]
-                try:
-                    user = await self.bot.fetch_user(item["added_by"])
-                    username = user.display_name
-                except:
-                    username = f"User {item['added_by']}"
+                username = user_cache[item["added_by"]]
                 loot_by_user[username].append(f"{item['quantity']}x {item['name']}")
 
             # Total loot summary
@@ -461,12 +486,18 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         else:
             embed.add_field(name="🎁 Loot Distribution", value="No loot items added yet", inline=False)
 
-        # Event creator and creation time
-        try:
-            creator = await self.bot.fetch_user(event_data["creator_id"])
-            embed.set_footer(text=f"Created by {creator.display_name}", icon_url=creator.display_avatar.url)
-        except:
-            embed.set_footer(text=f"Created by User {event_data['creator_id']}")
+        # Event creator and creation time (use cached data if available, otherwise fetch)
+        creator_id = event_data["creator_id"]
+        if creator_id in user_cache:
+            embed.set_footer(text=f"Created by {user_cache[creator_id]}")
+        else:
+            try:
+                creator = self.bot.get_user(creator_id)
+                if not creator:
+                    creator = await self.bot.fetch_user(creator_id)
+                embed.set_footer(text=f"Created by {creator.display_name}", icon_url=creator.display_avatar.url)
+            except:
+                embed.set_footer(text=f"Created by User {creator_id}")
 
         created_at = datetime.fromisoformat(event_data["created_at"].replace("Z", "+00:00"))
         embed.timestamp = created_at
@@ -540,23 +571,39 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             embed.set_field_at(0, name="Status", value="🔴 Completed", inline=True)
             await message.edit(embeds=message.embeds)
         except Exception:
-            logger.exception(f"[LOOT] Failed to update event message for event {thread_id}")
+            logger.exception(f"Failed to update event message for event {thread_id}")
 
         # Create dramatic finalization announcement
         if event_data['loot_items']:
-            # Calculate final totals
+            # Collect all unique user IDs (contributors + participants)
+            all_user_ids = set(event_data['participants'])
+            for item in event_data['loot_items']:
+                all_user_ids.add(item['added_by'])
+            
+            # Batch fetch all users at once
+            user_cache = {}
+            for user_id in all_user_ids:
+                try:
+                    user = self.bot.get_user(user_id)
+                    if not user:
+                        user = await self.bot.fetch_user(user_id)
+                    user_cache[user_id] = {
+                        'display_name': user.display_name,
+                        'mention': user.mention
+                    }
+                except:
+                    user_cache[user_id] = {
+                        'display_name': f"User {user_id}",
+                        'mention': f"<@{user_id}>"
+                    }
+            
+            # Calculate final totals using cached user data
             loot_summary = defaultdict(int)
             loot_by_user = defaultdict(list)
             
             for item in event_data['loot_items']:
                 loot_summary[item['name']] += item['quantity']
-                try:
-                    user = await self.bot.fetch_user(item['added_by'])
-                    username = user.display_name
-                    user_mention = user.mention
-                except:
-                    username = f"User {item['added_by']}"
-                    user_mention = f"<@{item['added_by']}>"
+                user_mention = user_cache[item['added_by']]['mention']
                 loot_by_user[user_mention].append(f"{item['quantity']}x {item['name']}")
 
             # Create the main announcement embed
@@ -578,14 +625,8 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                     inline=False
                 )
 
-            # Add distribution section with mentions for who gets what
-            participant_mentions = []
-            for participant_id in event_data['participants']:
-                try:
-                    user = await self.bot.fetch_user(participant_id)
-                    participant_mentions.append(user.mention)
-                except:
-                    participant_mentions.append(f"<@{participant_id}>")
+            # Add distribution section with mentions for who gets what (using cached data)
+            participant_mentions = [user_cache[participant_id]['mention'] for participant_id in event_data['participants']]
 
             distribution_lines = []
             individual_shares = []
@@ -650,17 +691,16 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                     )
                 
                 await main_channel.send(embed=summary_embed)
-                logger.info(f"[FINALIZE] Sent completion announcement to main channel for {event_data['name']}")
+                pass
                 
             except Exception as e:
-                logger.error(f"[FINALIZE] Failed to send main channel announcement: {e}")
+                logger.error(f"Failed to send main channel announcement: {e}")
                 
         else:
             await ctx.respond("🏁 Event finalized! No loot was collected during this event.", ephemeral=False)
 
         # Lock the thread
         await ctx.channel.edit(locked=True)
-        logger.info(f"[FINALIZE] Successfully finalized event and locked thread {ctx.channel.id}")
 
     @event.command(description="Show all events you've created or joined")
     async def list(self, ctx: discord.ApplicationContext) -> None:
@@ -820,10 +860,9 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             test_results.append("**🔌 Connection Test:**")
             await self.bot.redis.ping()
             test_results.append("✅ Redis connection successful")
-            logger.info("[REDIS-TEST] Connection test passed")
         except Exception as e:
             test_results.append(f"❌ Redis connection failed: {e}")
-            logger.error(f"[REDIS-TEST] Connection test failed: {e}")
+            logger.error(f" Connection test failed: {e}")
             all_passed = False
 
         try:
@@ -833,10 +872,9 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             test_value = f"test_value_{datetime.now(timezone.utc).timestamp()}"
             await self.bot.redis.set(test_key, test_value)
             test_results.append(f"✅ Successfully wrote test data")
-            logger.info(f"[REDIS-TEST] Write test passed: {test_key} = {test_value}")
         except Exception as e:
             test_results.append(f"❌ Write test failed: {e}")
-            logger.error(f"[REDIS-TEST] Write test failed: {e}")
+            logger.error(f" Write test failed: {e}")
             all_passed = False
 
         try:
@@ -845,14 +883,13 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             retrieved_value = await self.bot.redis.get(test_key)
             if retrieved_value == test_value:
                 test_results.append("✅ Successfully read test data")
-                logger.info(f"[REDIS-TEST] Read test passed: retrieved {retrieved_value}")
             else:
                 test_results.append(f"❌ Read test failed: expected {test_value}, got {retrieved_value}")
-                logger.error(f"[REDIS-TEST] Read test failed: expected {test_value}, got {retrieved_value}")
+                logger.error(f" Read test failed: expected {test_value}, got {retrieved_value}")
                 all_passed = False
         except Exception as e:
             test_results.append(f"❌ Read test failed: {e}")
-            logger.error(f"[REDIS-TEST] Read test failed: {e}")
+            logger.error(f" Read test failed: {e}")
             all_passed = False
 
         try:
@@ -863,14 +900,13 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             set_members = await self.bot.redis.smembers(test_set_key)
             if len(set_members) == 3:
                 test_results.append("✅ Set operations working correctly")
-                logger.info(f"[REDIS-TEST] Set operations test passed: {set_members}")
             else:
                 test_results.append(f"❌ Set operations failed: expected 3 items, got {len(set_members)}")
-                logger.error(f"[REDIS-TEST] Set operations test failed: {set_members}")
+                logger.error(f" Set operations test failed: {set_members}")
                 all_passed = False
         except Exception as e:
             test_results.append(f"❌ Set operations test failed: {e}")
-            logger.error(f"[REDIS-TEST] Set operations test failed: {e}")
+            logger.error(f" Set operations test failed: {e}")
             all_passed = False
 
         try:
@@ -882,14 +918,13 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             retrieved_hash = await self.bot.redis.hget(test_hash_key, "field1")
             if retrieved_hash == "value1":
                 test_results.append("✅ Hash operations working correctly")
-                logger.info(f"[REDIS-TEST] Hash operations test passed")
             else:
                 test_results.append(f"❌ Hash operations failed: expected 'value1', got {retrieved_hash}")
-                logger.error(f"[REDIS-TEST] Hash operations test failed: {retrieved_hash}")
+                logger.error(f" Hash operations test failed: {retrieved_hash}")
                 all_passed = False
         except Exception as e:
             test_results.append(f"❌ Hash operations test failed: {e}")
-            logger.error(f"[REDIS-TEST] Hash operations test failed: {e}")
+            logger.error(f" Hash operations test failed: {e}")
             all_passed = False
 
         try:
@@ -897,10 +932,8 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             test_results.append("\n**🧹 Cleanup:**")
             await self.bot.redis.delete(test_key, test_set_key, test_hash_key)
             test_results.append("✅ Test data cleaned up")
-            logger.info("[REDIS-TEST] Cleanup completed")
         except Exception as e:
             test_results.append(f"⚠️ Cleanup warning: {e}")
-            logger.warning(f"[REDIS-TEST] Cleanup warning: {e}")
 
         # Create result embed
         embed = discord.Embed(
@@ -971,7 +1004,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             logger.info(f"[CLEANUP] Completed: kept={kept_count}, cleaned={cleaned_count}")
 
         except Exception as e:
-            logger.error(f"[CLEANUP] Error during cleanup: {e}")
+            logger.error(f" Error during cleanup: {e}")
             embed = discord.Embed(title="❌ Cleanup Failed", description=f"An error occurred during cleanup: {e}", colour=0xFF0000)
             await ctx.followup.send(embed=embed, ephemeral=True)
 
