@@ -14,7 +14,7 @@ Designed for performance, modularity, and ease of deployment.
 
 ```bash
 # Install dependencies
-poetry install
+poetry install --no-root
 
 # Run the bot
 poetry run python main.py
