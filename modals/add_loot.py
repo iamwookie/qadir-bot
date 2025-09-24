@@ -90,9 +90,7 @@ class AddLootModal(discord.ui.Modal):
         event_data["loot_items"].append(loot_item)
 
         # Update Redis
-        await client.redis.hset(f"qadir:event:{self.event_thread_id}", mapping={
-            "data": json.dumps(event_data)
-        })
+        await client.redis.hset(f"qadir:event:{self.event_thread_id}", "data", json.dumps(event_data))
 
         # Update the event message
         try:

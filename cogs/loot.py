@@ -4,12 +4,16 @@ from datetime import datetime, timezone
 from collections import defaultdict
 
 import discord
-from discord.ext import commands
 
 from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed
 from modals import CreateEventModal, AddLootModal
+
+GUILD_IDS: list[int] = config["loot"]["guilds"]
+CHANNEL_IDS: list[int] = config["loot"]["channels"]
+
+logger = logging.getLogger("qadir")
 
 
 class EventSelectionView(discord.ui.View):
@@ -75,10 +79,7 @@ class EventSelect(discord.ui.Select):
         elif self.action == 'summary':
             await loot_cog._handle_event_summary(interaction, selected_thread_id)
 
-GUILD_IDS: list[int] = config["loot"]["guilds"]
-CHANNEL_IDS: list[int] = config["loot"]["channels"]
 
-logger = logging.getLogger("qadir")
 
 
 class LootCog(Cog, guild_ids=GUILD_IDS):
@@ -202,9 +203,9 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         await interaction.response.send_modal(modal)
 
     # Main events command group
-    events = discord.SlashCommandGroup("events", "Manage loot tracking events")
+    event = discord.SlashCommandGroup("event", "Manage loot tracking events")
 
-    @events.command(description="Create a new loot tracking event")
+    @event.command(description="Create a new loot tracking event")
     async def create(self, ctx: discord.ApplicationContext) -> None:
         """
         Create a new loot tracking event where participants can add items and see automatic distribution.
@@ -222,7 +223,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         modal = CreateEventModal(title="Create Loot Event")
         await ctx.send_modal(modal)
 
-    @events.command(description="Join an active event to participate in loot tracking")
+    @event.command(description="Join an active event to participate in loot tracking")
     async def join(self, ctx: discord.ApplicationContext) -> None:
         """
         Join an active event so you can add loot items and participate in distribution.
@@ -272,7 +273,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         view = EventSelectionView(all_events, ctx.author.id, 'join')
         await ctx.respond(embed=embed, view=view, ephemeral=True)
 
-    @events.command(description="Add loot items you've collected to an event")
+    @event.command(description="Add loot items you've collected to an event")
     async def add_loot(self, ctx: discord.ApplicationContext) -> None:
         """
         Add loot items you've collected to an event for distribution calculation.
@@ -308,7 +309,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         view = EventSelectionView(user_events, ctx.author.id, 'add_loot')
         await ctx.respond(embed=embed, view=view, ephemeral=True)
 
-    @events.command(description="Show detailed summary of an event with loot distribution")
+    @event.command(description="Show detailed summary of an event with loot distribution")
     async def summary(self, ctx: discord.ApplicationContext) -> None:
         """
         Show a comprehensive summary of an event including all participants, 
@@ -447,7 +448,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         else:
             await interaction.respond(embed=embed, ephemeral=True)
 
-    @events.command(description="Close and finalize event with final distribution (event creator only)")
+    @event.command(description="Close and finalize event with final distribution (event creator only)")
     async def finalize(self, ctx: discord.ApplicationContext) -> None:
         """
         Finalize the current event, lock the thread, and show final loot distribution.
@@ -536,7 +537,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         # Lock the thread
         await ctx.channel.edit(locked=True)
 
-    @events.command(description="Show all events you've created or joined")
+    @event.command(description="Show all events you've created or joined")
     async def list(self, ctx: discord.ApplicationContext) -> None:
         """
         Display a list of all loot tracking events you've created or are participating in,
@@ -597,7 +598,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @events.command(description="Check your current loot tracking status and get guidance")
+    @event.command(description="Check your current loot tracking status and get guidance")
     async def status(self, ctx: discord.ApplicationContext) -> None:
         """
         Check your current status in the loot tracking system and get helpful guidance
@@ -668,7 +669,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @events.command(description="Debug: Check Redis event storage")
+    @event.command(description="Debug: Check Redis event storage")
     async def debug(self, ctx: discord.ApplicationContext) -> None:
         """Debug command to check what events are stored in Redis."""
         await ctx.defer(ephemeral=True)
@@ -703,7 +704,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @events.command(description="Test Redis connection and basic operations")
+    @event.command(description="Test Redis connection and basic operations")
     async def test_redis(self, ctx: discord.ApplicationContext) -> None:
         """Test Redis connection and basic operations."""
         await ctx.defer(ephemeral=True)
@@ -820,7 +821,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
 
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @events.command(description="Clean up orphaned event data in Redis")
+    @event.command(description="Clean up orphaned event data in Redis")
     async def cleanup(self, ctx: discord.ApplicationContext) -> None:
         """Clean up orphaned event data where thread IDs don't match stored data."""
         await ctx.defer(ephemeral=True)
