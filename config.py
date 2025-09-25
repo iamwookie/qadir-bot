@@ -37,7 +37,7 @@ class Config(TypedDict):
 def load_config() -> Config:
     """Load the configuration from the appropriate TOML file based on the environment."""
 
-    path = "config.production.toml" if PYTHON_ENV == "production" else "config.development.toml"
+    path = "config.toml" if PYTHON_ENV == "production" else "config.dev.toml"
 
     with open(path, "rb") as f:
         return tomllib.load(f)
