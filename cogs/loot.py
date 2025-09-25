@@ -351,7 +351,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         await ctx.respond(embed=embed, view=view, ephemeral=True)
 
     @event.command(description="Add loot items you've collected to an event")
-    async def add_loot(self, ctx: discord.ApplicationContext) -> None:
+    async def loot(self, ctx: discord.ApplicationContext) -> None:
         """
         Add loot items you've collected to an event for distribution calculation.
         Shows you a list of events you're participating in to choose from.

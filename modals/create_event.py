@@ -117,22 +117,22 @@ class CreateEventModal(discord.ui.Modal):
             # Verify the data was stored
             stored_data = await client.redis.hget(f"qadir:event:{thread_id_str}", "data")
             if stored_data:
-                logger.info(f"[REDIS] Verification: Successfully retrieved stored data for thread {thread_id_str}")
+                logger.info(f"[REDIS] Verification: Successfully Retrieved Stored Data For Thread {thread_id_str}")
                 # Double-check the thread_id in the stored data matches
                 try:
                     verified_data = json.loads(stored_data)
                     stored_thread_id = verified_data.get("thread_id")
                     if stored_thread_id == thread_id_str:
-                        logger.info(f"[REDIS] Thread ID consistency verified: {stored_thread_id}")
+                        logger.info(f"[REDIS] Thread ID Consistency Verified: {stored_thread_id}")
                     else:
-                        logger.error(f"[REDIS] Thread ID MISMATCH: key={thread_id_str}, stored={stored_thread_id}")
-                except Exception as parse_error:
-                    logger.error(f"[REDIS] Failed to verify stored data: {parse_error}")
+                        logger.error(f"[REDIS] Thread ID Mismatch: key={thread_id_str}, stored={stored_thread_id}")
+                except Exception:
+                    logger.exception(f"[REDIS] Failed To Verify Stored Data")
             else:
-                logger.error(f"[REDIS] Verification FAILED: Could not retrieve stored data for thread {thread_id_str}")
+                logger.error(f"[REDIS] Verification Failed: Could Not Retrieve Stored Data For Thread {thread_id_str}")
 
         except Exception as e:
-            logger.error(f"[REDIS] Failed to store event data for thread {thread_id_str}: {e}")
+            logger.exception(f"[REDIS] Failed to store event data for thread {thread_id_str}: {e}")
             embed = ErrorEmbed(
                 title="⚠️ Database Error",
                 description=f"Event **{event_name}** was created but there was an issue saving to database. Please contact an admin.",

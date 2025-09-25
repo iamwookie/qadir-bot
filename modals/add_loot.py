@@ -15,6 +15,7 @@ class AddLootModal(discord.ui.Modal):
 
     def __init__(self, event_thread_id: int, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+
         self.event_thread_id = event_thread_id
 
         self.add_item(
