@@ -17,7 +17,7 @@ GUILD_IDS: list[int] = config.get("hangar", {}).get("guilds", [])
 logger = logging.getLogger("qadir")
 
 
-class HangarCog(Cog, guild_ids=GUILD_IDS):
+class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     """
     A cog to manage Star Citizen executive hangar timers and tracking.
     Used for timing hangar rentals and managing fleet operations.

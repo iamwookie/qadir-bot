@@ -83,7 +83,7 @@ class EventSelect(discord.ui.Select):
                 await loot_cog._handle_event_summary(interaction, selected_thread_id)
 
 
-class LootCog(Cog, guild_ids=GUILD_IDS):
+class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
     """
     A cog to manage loot tracking events where participants can add items
     they've collected and see automatic distribution calculations.
@@ -308,7 +308,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
         if ctx.channel_id not in CHANNEL_IDS:
             allowed_channels = [f"<#{channel_id}>" for channel_id in CHANNEL_IDS]
             embed = ErrorEmbed(description=f"This command can only be used in: {', '.join(allowed_channels)}")
-            await ctx.followup.send(embed=embed, ephemeral=True)
+            await ctx.respond(embed=embed, ephemeral=True)
             return
 
         modal = CreateEventModal(title="Create Loot Event")

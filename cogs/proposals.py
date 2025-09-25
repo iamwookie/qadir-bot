@@ -15,7 +15,7 @@ ROLE_IDS: list[int] = config["proposals"]["roles"]
 logger = logging.getLogger("qadir")
 
 
-class ProposalsCog(Cog, guild_ids=GUILD_IDS):
+class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
     """
     A cog to manage proposals and voting using 👍/👎 reactions.
     Ensures users can only vote one way per proposal, and processes results after 24 hours.
