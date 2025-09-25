@@ -41,7 +41,7 @@ class AddLootModal(discord.ui.Modal):
         client: Qadir = interaction.client
 
         # Get event data from Redis
-        event_data_raw = await client.redis.hget(f"qadir:event:{self.event_thread_id}", "data")
+        event_data_raw = await client.redis.get(f"qadir:event:{self.event_thread_id}")
         if not event_data_raw:
             embed = ErrorEmbed(description="Event not found or has been deleted.")
             await interaction.followup.send(embed=embed, ephemeral=True)
@@ -86,7 +86,7 @@ class AddLootModal(discord.ui.Modal):
         event_data["loot_items"].append(loot_item)
 
         # Update Redis
-        await client.redis.hset(f"qadir:event:{self.event_thread_id}", "data", json.dumps(event_data))
+        await client.redis.set(f"qadir:event:{self.event_thread_id}", json.dumps(event_data))
 
         # Update the event card with new loot
         loot_cog = client.get_cog("LootCog")

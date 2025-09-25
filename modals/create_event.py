@@ -51,21 +51,15 @@ class CreateEventModal(discord.ui.Modal):
         event_embed.add_field(name="Status", value="🟢 Active", inline=True)
         event_embed.add_field(name="Participants", value="1", inline=True)
         event_embed.add_field(name="Total Items", value="0", inline=True)
-        
+
         # Add loot breakdown section (initially empty)
         event_embed.add_field(
-            name="🎁 Current Loot Breakdown",
-            value="*No loot added yet - use `/events add-loot` to contribute!*",
-            inline=False
+            name="🎁 Current Loot Breakdown", value="*No loot added yet - use `/events add-loot` to contribute!*", inline=False
         )
-        
+
         # Add distribution preview (initially empty)
-        event_embed.add_field(
-            name="⚖️ Distribution Preview",
-            value="*Distribution will be calculated once loot is added*",
-            inline=False
-        )
-        
+        event_embed.add_field(name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added*", inline=False)
+
         event_embed.set_footer(text=f"Created by {interaction.user}", icon_url=interaction.user.display_avatar.url)
         event_embed.timestamp = datetime.now(timezone.utc)
 
@@ -107,7 +101,7 @@ class CreateEventModal(discord.ui.Modal):
             logger.info(f"[REDIS] Event data: {json.dumps(event_data, indent=2)}")
 
             # Store event data
-            await client.redis.hset(f"qadir:event:{thread_id_str}", "data", json.dumps(event_data))
+            await client.redis.set(f"qadir:event:{thread_id_str}", json.dumps(event_data))
             logger.info(f"[REDIS] Successfully stored event data for thread {thread_id_str}")
 
             # Add to events set
@@ -115,7 +109,7 @@ class CreateEventModal(discord.ui.Modal):
             logger.info(f"[REDIS] Successfully added thread {thread_id_str} to events set")
 
             # Verify the data was stored
-            stored_data = await client.redis.hget(f"qadir:event:{thread_id_str}", "data")
+            stored_data = await client.redis.get(f"qadir:event:{thread_id_str}")
             if stored_data:
                 logger.info(f"[REDIS] Verification: Successfully Retrieved Stored Data For Thread {thread_id_str}")
                 # Double-check the thread_id in the stored data matches
