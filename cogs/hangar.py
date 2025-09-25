@@ -168,7 +168,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         embed.set_footer(text="Data from contestedzonetimers.com")
         return embed
 
-    @tasks.loop(days=1)
+    @tasks.loop(hours=24)
     async def update_cycle_data(self):
         """Update cycle start data every day."""
 
