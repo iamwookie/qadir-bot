@@ -132,13 +132,16 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
     def _format_time(self, seconds: int) -> str:
         """Format seconds as HH:MM:SS."""
+
         hours = math.floor(seconds / 3600)
         mins = math.floor((seconds % 3600) / 60)
         secs = seconds % 60
+
         return f"{hours:02d}:{mins:02d}:{secs:02d}"
 
     def _create_hangar_embed(self, state: dict) -> discord.Embed:
         """Create the hangar status embed."""
+
         embed = discord.Embed(title="🚀 Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc))
 
         # Status field
@@ -165,9 +168,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         embed.set_footer(text="Data from contestedzonetimers.com")
         return embed
 
-    @tasks.loop(minutes=5)
+    @tasks.loop(days=1)
     async def update_cycle_data(self):
-        """Update cycle start data every 5 minutes."""
+        """Update cycle start data every day."""
+
         try:
             new_cycle_start = await self._fetch_cycle_start()
             if new_cycle_start:
@@ -181,6 +185,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     @update_cycle_data.before_loop
     async def before_update_cycle_data(self):
         """Initialize cycle data before starting the loop."""
+
         await self.bot.wait_until_ready()
 
         # Try to load from Redis first
@@ -197,9 +202,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         except Exception as e:
             logger.error(f"[HANGAR] Error initializing cycle data: {e}")
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=1)
     async def update_hangar_embeds(self):
-        """Update all tracked hangar embeds every 30 seconds."""
+        """Update all tracked hangar embeds every minute."""
+
         try:
             # Get all tracked embed message IDs
             embed_ids = await self.bot.redis.smembers("qadir:hangar:embeds")
