@@ -1,10 +1,9 @@
 import logging
-import os
 import sys
 
 from discord import Intents
 
-from config import config
+from config import DISCORD_TOKEN, config
 from core import Qadir
 
 if __name__ == "__main__":
@@ -30,4 +29,4 @@ if __name__ == "__main__":
     bot.load_extension("cogs.hangar")
     bot.load_extension("cogs.loot")
 
-    bot.run(os.getenv("DISCORD_TOKEN"))
+    bot.run(DISCORD_TOKEN)
