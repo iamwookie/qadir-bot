@@ -1,14 +1,14 @@
 import json
 import logging
-from datetime import datetime, timezone
 from collections import defaultdict
+from datetime import datetime, timezone
 
 import discord
 
 from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed, SuccessEmbed
-from modals import CreateEventModal, AddLootModal
+from modals import AddLootModal, CreateEventModal
 
 GUILD_IDS: list[int] = config["loot"]["guilds"]
 CHANNEL_IDS: list[int] = config["loot"]["channels"]
@@ -155,7 +155,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                         if not user:
                             user = await self.bot.fetch_user(user_id)
                         user_cache[user_id] = user.display_name
-                    except:
+                    except Exception:
                         user_cache[user_id] = f"User {user_id}"
 
                 # Now process loot items using cached user data
@@ -454,7 +454,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 if not user:
                     user = await self.bot.fetch_user(user_id)
                 user_cache[user_id] = user.display_name
-            except:
+            except Exception:
                 user_cache[user_id] = f"User {user_id}"
 
         # Participants list using cached data
@@ -504,7 +504,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 if not creator:
                     creator = await self.bot.fetch_user(creator_id)
                 embed.set_footer(text=f"Created by {creator.display_name}", icon_url=creator.display_avatar.url)
-            except:
+            except Exception:
                 embed.set_footer(text=f"Created by User {creator_id}")
 
         created_at = datetime.fromisoformat(event_data["created_at"].replace("Z", "+00:00"))
@@ -555,7 +555,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 description=f"Only the event creator can finalize the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>",
             )
             await ctx.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"[FINALIZE] Permission denied message sent, returning early")
+            logger.info("[FINALIZE] Permission denied message sent, returning early")
             return
 
         logger.info(f"[FINALIZE] Permission check passed - user {current_user_id} is the creator")
@@ -598,7 +598,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                     if not user:
                         user = await self.bot.fetch_user(user_id)
                     user_cache[user_id] = {"display_name": user.display_name, "mention": user.mention}
-                except:
+                except Exception:
                     user_cache[user_id] = {"display_name": f"User {user_id}", "mention": f"<@{user_id}>"}
 
             # Calculate final totals using cached user data
@@ -763,7 +763,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 try:
                     thread = await self.bot.fetch_channel(event["thread_id"])
                     event_list.append(f"🏆 **{event['name']}** - {thread.mention}")
-                except:
+                except Exception:
                     event_list.append(f"🏆 **{event['name']}** (Thread not found)")
 
             embed.add_field(name="📋 Your Active Events", value="\n".join(event_list), inline=False)
@@ -825,7 +825,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                 except Exception as e:
                     debug_info.append(f"  - Error parsing data: {e}")
             else:
-                debug_info.append(f"  - No data found for this ID")
+                debug_info.append("  - No data found for this ID")
 
         embed = discord.Embed(title="🔍 Redis Debug Info", description="\n".join(debug_info), colour=0xFF0000)
 
@@ -855,7 +855,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
             test_key = "qadir:test:write"
             test_value = f"test_value_{datetime.now(timezone.utc).timestamp()}"
             await self.bot.redis.set(test_key, test_value)
-            test_results.append(f"✅ Successfully wrote test data")
+            test_results.append("✅ Successfully wrote test data")
         except Exception as e:
             test_results.append(f"❌ Write test failed: {e}")
             logger.error(f" Write test failed: {e}")
@@ -980,7 +980,7 @@ class LootCog(Cog, guild_ids=GUILD_IDS):
                         logger.info(f"[CLEANUP] Removed corrupted event data for {event_id_str}")
                         cleaned_count += 1
 
-            embed = SuccessEmbed(title="🧹 Redis Cleanup Results", description=f"Cleanup completed successfully!")
+            embed = SuccessEmbed(title="🧹 Redis Cleanup Results", description="Cleanup completed successfully!")
             embed.add_field(name="Events Kept", value=str(kept_count), inline=True)
             embed.add_field(name="Events Cleaned", value=str(cleaned_count), inline=True)
 

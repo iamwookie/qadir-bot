@@ -7,7 +7,7 @@ import discord
 
 from config import config
 from core import Qadir
-from core.embeds import SuccessEmbed, ErrorEmbed
+from core.embeds import ErrorEmbed, SuccessEmbed
 
 CHANNEL_ID: int = config["loot"]["channels"][0]
 
@@ -121,7 +121,7 @@ class CreateEventModal(discord.ui.Modal):
                     else:
                         logger.error(f"[REDIS] Thread ID Mismatch: key={thread_id_str}, stored={stored_thread_id}")
                 except Exception:
-                    logger.exception(f"[REDIS] Failed To Verify Stored Data")
+                    logger.exception("[REDIS] Failed To Verify Stored Data")
             else:
                 logger.error(f"[REDIS] Verification Failed: Could Not Retrieve Stored Data For Thread {thread_id_str}")
 

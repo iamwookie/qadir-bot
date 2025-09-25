@@ -50,7 +50,7 @@ class UtilityCog(Cog):
                 if not command.guild_ids or (ctx.guild and ctx.guild.id in command.guild_ids):
                     command_name = f"/{command.name}"
                     command_desc = command.description or "No description provided"
-                    
+
                     if command.name in ["ping", "info", "help", "find"]:
                         utility_commands.append((command_name, command_desc))
                     elif command.name == "events":

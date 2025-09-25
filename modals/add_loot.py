@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import discord
 
 from core import Qadir
-from core.embeds import SuccessEmbed, ErrorEmbed
+from core.embeds import ErrorEmbed, SuccessEmbed
 
 logger = logging.getLogger("qadir")
 
