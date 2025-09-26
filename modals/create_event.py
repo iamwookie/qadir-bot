@@ -5,11 +5,8 @@ from enum import Enum
 
 import discord
 
-from config import config
 from core import Qadir
 from core.embeds import ErrorEmbed, SuccessEmbed
-
-CHANNEL_ID: int = config["loot"]["channels"][0]
 
 logger = logging.getLogger("qadir")
 
@@ -37,7 +34,12 @@ class CreateEventModal(discord.ui.Modal):
 
         await interaction.response.defer(ephemeral=True)
 
-        channel: discord.TextChannel = await interaction.client.fetch_channel(CHANNEL_ID)
+        channel = interaction.channel
+
+        if not isinstance(channel, discord.TextChannel):
+            embed = ErrorEmbed(title="⚠️ Invalid Channel", description="Please use this command in a text channel.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
 
         event_name = self.children[0].value
         description = self.children[1].value
@@ -52,13 +54,14 @@ class CreateEventModal(discord.ui.Modal):
         event_embed.add_field(name="Participants", value="1", inline=True)
         event_embed.add_field(name="Total Items", value="0", inline=True)
 
+        # Add participant list
+        event_embed.add_field(name="👥 Participants", value=interaction.user.display_name, inline=False)
+
         # Add loot breakdown section (initially empty)
-        event_embed.add_field(
-            name="🎁 Current Loot Breakdown", value="*No loot added yet - use `/events add-loot` to contribute!*", inline=False
-        )
+        event_embed.add_field(name="🎁 Loot Breakdown", value="*No loot added yet - use `/event loot` to contribute!*", inline=False)
 
         # Add distribution preview (initially empty)
-        event_embed.add_field(name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added*", inline=False)
+        event_embed.add_field(name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added.*", inline=False)
 
         event_embed.set_footer(text=f"Created by {interaction.user}", icon_url=interaction.user.display_avatar.url)
         event_embed.timestamp = datetime.now(timezone.utc)
@@ -67,10 +70,10 @@ class CreateEventModal(discord.ui.Modal):
         instructions_embed = discord.Embed(
             title="📋 How to participate:",
             description=(
-                "• Use `/join-event` to join this event\n"
-                "• Use `/add-loot` to add items you've collected\n"
-                "• Use `/event-summary` to see current totals\n"
-                "• Event creator can use `/finalize-event` to close and distribute loot"
+                "• Check the event card above for current totals and distribution\n"
+                "• Use `/event join` to join this event\n"
+                "• Use `/event loot` to add items you've collected\n"
+                "• Event creator can use `/event finalize` to finalise the event"
             ),
             colour=0x0099FF,
         )
@@ -97,21 +100,21 @@ class CreateEventModal(discord.ui.Modal):
         }
 
         try:
-            logger.info(f"[REDIS] Storing event data for thread {thread.id}")
-            logger.info(f"[REDIS] Event data: {json.dumps(event_data, indent=2)}")
+            logger.info(f"[REDIS] Storing Event Data For Thread {thread.id}")
+            logger.info(f"[REDIS] Event Data: {json.dumps(event_data, indent=2)}")
 
             # Store event data
             await client.redis.set(f"qadir:event:{thread_id_str}", json.dumps(event_data))
-            logger.info(f"[REDIS] Successfully stored event data for thread {thread_id_str}")
+            logger.info(f"[REDIS] Successfully Stored Event Data For Thread {thread_id_str}")
 
             # Add to events set
             await client.redis.sadd("qadir:events", thread_id_str)
-            logger.info(f"[REDIS] Successfully added thread {thread_id_str} to events set")
+            logger.info(f"[REDIS] Successfully Added Thread {thread_id_str} To Events Set")
 
             # Verify the data was stored
             stored_data = await client.redis.get(f"qadir:event:{thread_id_str}")
             if stored_data:
-                logger.info(f"[REDIS] Verification: Successfully Retrieved Stored Data For Thread {thread_id_str}")
+                logger.info(f"[REDIS] Verification: Successfully Retrieved Stored Data For Thread: {thread_id_str}")
                 # Double-check the thread_id in the stored data matches
                 try:
                     verified_data = json.loads(stored_data)
@@ -123,10 +126,10 @@ class CreateEventModal(discord.ui.Modal):
                 except Exception:
                     logger.exception("[REDIS] Failed To Verify Stored Data")
             else:
-                logger.error(f"[REDIS] Verification Failed: Could Not Retrieve Stored Data For Thread {thread_id_str}")
+                logger.error(f"[REDIS] Verification Failed: Could Not Retrieve Stored Data For Thread: {thread_id_str}")
 
-        except Exception as e:
-            logger.exception(f"[REDIS] Failed to store event data for thread {thread_id_str}: {e}")
+        except Exception:
+            logger.exception(f"[REDIS] Failed To Store Event Data For Thread: {thread_id_str}")
             embed = ErrorEmbed(
                 title="⚠️ Database Error",
                 description=f"Event **{event_name}** was created but there was an issue saving to database. Please contact an admin.",
@@ -135,7 +138,6 @@ class CreateEventModal(discord.ui.Modal):
             return
 
         embed = SuccessEmbed(
-            title="✅ Event Created Successfully!",
             description=f"Event **{event_name}** has been created in {thread.mention}!\nYou've been automatically added as a participant.",
         )
         await interaction.followup.send(embed=embed, ephemeral=True)

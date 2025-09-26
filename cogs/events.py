@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 from collections import defaultdict
@@ -10,8 +12,8 @@ from core import Cog, Qadir
 from core.embeds import ErrorEmbed, SuccessEmbed
 from modals import AddLootModal, CreateEventModal
 
-GUILD_IDS: list[int] = config["loot"]["guilds"]
-CHANNEL_IDS: list[int] = config["loot"]["channels"]
+GUILD_IDS: list[int] = config["events"]["guilds"]
+CHANNEL_IDS: list[int] = config["events"]["channels"]
 
 logger = logging.getLogger("qadir")
 
@@ -19,8 +21,10 @@ logger = logging.getLogger("qadir")
 class EventSelectionView(discord.ui.View):
     """View for selecting events with dropdown."""
 
-    def __init__(self, events: list, user_id: int, action: str):
+    def __init__(self, cog: "EventsCog", events: list, user_id: int, action: str):
         super().__init__(timeout=300)
+
+        self.cog = cog
         self.events = events
         self.user_id = user_id
         self.action = action
@@ -35,62 +39,48 @@ class EventSelectionView(discord.ui.View):
             description = f"{participant_text} • {len(event['loot_items'])} items"
 
             options.append(
-                discord.SelectOption(
-                    label=event["name"][:100], value=str(event["thread_id"]), description=description[:100], emoji=emoji  # Discord limit
-                )
+                discord.SelectOption(label=event["name"][:100], value=str(event["thread_id"]), description=description[:100], emoji=emoji)
             )
 
         if options:
-            select = EventSelect(
-                options,
-                self.action,
-                disabled_values=(
-                    [str(event["thread_id"]) for event in events if user_id in event["participants"]] if action == "join" else []
-                ),
-            )
+            select = EventSelect(self.cog, options, self.action)
             self.add_item(select)
 
 
 class EventSelect(discord.ui.Select):
     """Dropdown for event selection."""
 
-    def __init__(self, options: list, action: str, disabled_values: list = None):
+    def __init__(self, cog: "EventsCog", options: list, action: str):
         super().__init__(placeholder=f"Choose an event to {action}...", options=options, min_values=1, max_values=1)
+
+        self.cog = cog
         self.action = action
-        self.disabled_values = disabled_values or []
 
     async def callback(self, interaction: discord.Interaction):
         selected_thread_id = int(self.values[0])
 
-        # Disable already joined events for join action
-        if self.action == "join" and str(selected_thread_id) in self.disabled_values:
-            await interaction.response.send_message("❌ You're already a member of this event!", ephemeral=True)
-            return
-
-        # Get the loot cog instance
-        loot_cog = interaction.client.get_cog("LootCog")
-
-        # Handle add_loot differently since it needs to send a modal (can't defer first)
-        if self.action == "add_loot":
-            await loot_cog._handle_add_loot(interaction, selected_thread_id)
-        else:
-            # For other actions, defer first to prevent timeout
-            await interaction.response.defer(ephemeral=True)
-
-            if self.action == "join":
-                await loot_cog._handle_join_event(interaction, selected_thread_id)
-            elif self.action == "summary":
-                await loot_cog._handle_event_summary(interaction, selected_thread_id)
+        # Handle loot differently since it needs to send a modal (can't defer first)
+        if self.action == "loot":
+            await self.cog._handle_loot(interaction, selected_thread_id)
+        elif self.action == "join":
+            await self.cog._handle_join(interaction, selected_thread_id)
 
 
-class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
+class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
     """
     A cog to manage loot tracking events where participants can add items
     they've collected and see automatic distribution calculations.
     """
 
     async def _get_user_active_events(self, user_id: int) -> list:
-        """Get list of active events that a user is participating in."""
+        """Get a list of active events that a user is participating in.
+
+        Args:
+            user_id (int): The Discord user ID to check for active events.
+        Returns:
+            A list of active event dictionaries that the user participates in.
+        """
+
         event_ids = await self.bot.redis.smembers("qadir:events")
         user_events = []
 
@@ -106,7 +96,12 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
         return user_events
 
     async def _update_event_card(self, event_data: dict) -> None:
-        """Update the event card with current loot breakdown and distribution."""
+        """Update an event card with current loot breakdown and distribution.
+
+        Args:
+            event_data (dict): The event data to update the card with.
+        """
+
         try:
             thread_id = int(event_data["thread_id"])
             message_id = int(event_data["message_id"])
@@ -133,6 +128,10 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
             event_embed.set_field_at(1, name="Participants", value=str(participant_count), inline=True)
             event_embed.set_field_at(2, name="Total Items", value=str(total_items), inline=True)
 
+            # Create participant list using direct mentions
+            participants = [f"<@{participant_id}>" for participant_id in event_data["participants"]]
+            participant_text = ", ".join(participants) if participants else "No participants yet"
+
             # Calculate loot breakdown and distribution
             if event_data["loot_items"]:
                 from collections import defaultdict
@@ -141,33 +140,16 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                 loot_summary = defaultdict(int)
                 loot_by_user = defaultdict(list)
 
-                # Batch collect all unique user IDs to minimize API calls
-                unique_user_ids = set()
-                for item in event_data["loot_items"]:
-                    unique_user_ids.add(item["added_by"])
-
-                # Create user cache for this operation
-                user_cache = {}
-                for user_id in unique_user_ids:
-                    try:
-                        # Try to get from cache first
-                        user = self.bot.get_user(user_id)
-                        if not user:
-                            user = await self.bot.fetch_user(user_id)
-                        user_cache[user_id] = user.display_name
-                    except Exception:
-                        user_cache[user_id] = f"User {user_id}"
-
-                # Now process loot items using cached user data
+                # Process loot items using direct mentions
                 for item in event_data["loot_items"]:
                     loot_summary[item["name"]] += item["quantity"]
-                    username = user_cache[item["added_by"]]
-                    loot_by_user[username].append(f"{item['quantity']}x {item['name']}")
+                    user_mention = f"<@{item['added_by']}>"
+                    loot_by_user[user_mention].append(f"{item['quantity']}x {item['name']}")
 
                 # Create loot breakdown text
                 breakdown_lines = []
-                for username, items in sorted(loot_by_user.items()):
-                    breakdown_lines.append(f"**{username}**: {', '.join(items)}")
+                for user_mention, items in sorted(loot_by_user.items()):
+                    breakdown_lines.append(f"**{user_mention}**: {', '.join(items)}")
 
                 breakdown_text = "\n".join(breakdown_lines) if breakdown_lines else "No contributions yet"
 
@@ -185,43 +167,44 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                 distribution_text = "\n".join(distribution_lines) if distribution_lines else "No items to distribute"
 
                 # Update the embed fields
-                event_embed.set_field_at(
-                    3, name="🎁 Current Loot Breakdown", value=breakdown_text[:1024], inline=False
-                )  # Discord field limit
-                event_embed.set_field_at(4, name="⚖️ Distribution Preview", value=distribution_text[:1024], inline=False)
+                event_embed.set_field_at(3, name="👥 Participants", value=participant_text[:1024], inline=False)
+                event_embed.set_field_at(4, name="🎁 Loot Breakdown", value=breakdown_text[:1024], inline=False)  # Discord field limit
+                event_embed.set_field_at(5, name="⚖️ Distribution Preview", value=distribution_text[:1024], inline=False)
             else:
                 # No loot yet
+                event_embed.set_field_at(3, name="👥 Participants", value=participant_text[:1024], inline=False)
                 event_embed.set_field_at(
-                    3, name="🎁 Current Loot Breakdown", value="*No loot added yet - use `/events add-loot` to contribute!*", inline=False
+                    4, name="🎁 Current Loot Breakdown", value="*No loot added yet - use `/event loot` to contribute!*", inline=False
                 )
                 event_embed.set_field_at(
-                    4, name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added*", inline=False
+                    5, name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added*", inline=False
                 )
 
             # Update the message
             await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
-            logger.info(f"[EVENT-CARD] Successfully updated event card for {event_data['name']}")
+            logger.info(f"[EVENT-CARD] Successfully Updated Event Card For {event_data['name']}")
 
-        except Exception as e:
-            logger.error(f"[EVENT-CARD] Failed to update event card: {e}")
+        except Exception:
+            logger.exception("[EVENT-CARD] Failed To Update Event Card")
 
     async def _get_all_active_events(self) -> list:
         """Get all active events."""
+
         try:
-            logger.info("[REDIS] Getting all event IDs from qadir:events")
+            logger.info("[REDIS] Getting All Event IDs From qadir:events")
             event_ids = await self.bot.redis.smembers("qadir:events")
-            logger.info(f"[REDIS] Found {len(event_ids)} event IDs: {list(event_ids)}")
+            logger.info(f"[REDIS] Found {len(event_ids)} Event IDs: {list(event_ids)}")
 
             active_events = []
 
             for event_id in event_ids:
-                logger.info(f"[REDIS] Fetching data for event {event_id} (type: {type(event_id)})")
+                logger.info(f"[REDIS] Fetching Data For Event {event_id} (type: {type(event_id)})")
                 # Ensure event_id is a string for consistent key formatting
                 event_id_str = str(event_id) if isinstance(event_id, int) else event_id
                 event_data_raw = await self.bot.redis.get(f"qadir:event:{event_id_str}")
 
                 if not event_data_raw:
-                    logger.warning(f"[REDIS] No data found for event {event_id}")
+                    logger.warning(f"[REDIS] No Data Found For Event {event_id}")
                     continue
 
                 try:
@@ -232,23 +215,32 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
 
                     if event_data["status"] == "active":
                         active_events.append(event_data)
-                        logger.info(f"[REDIS] Added active event {event_id} to results")
+                        logger.info(f"[REDIS] Added Active Event {event_id} To Results")
                     else:
-                        logger.info(f"[REDIS] Skipping event {event_id} (status: {event_data['status']})")
+                        logger.info(f"[REDIS] Skipping Event {event_id} (status: {event_data['status']})")
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"[REDIS] Failed to parse JSON for event {event_id}: {e}")
+                    logger.error(f"[REDIS] Failed To Parse JSON For Event {event_id}: {e}")
                     continue
 
-            logger.info(f"[REDIS] Returning {len(active_events)} active events")
+            logger.info(f"[REDIS] Returning {len(active_events)} Active Events")
             return active_events
 
-        except Exception as e:
-            logger.error(f"[REDIS] Error in _get_all_active_events: {e}")
+        except Exception:
+            logger.exception("[REDIS] Error In _get_all_active_events")
             return []
 
-    async def _handle_join_event(self, interaction: discord.Interaction, thread_id: int):
-        """Handle joining an event via dropdown selection."""
+    async def _handle_join(self, interaction: discord.Interaction, thread_id: int):
+        """
+        Handle joining an event via dropdown selection.
+
+        Args:
+            interaction (discord.Interaction): The interaction object.
+            thread_id (int): The ID of the event thread to join.
+        """
+
+        await interaction.response.defer(ephemeral=True)
+
         event_data_raw = await self.bot.redis.get(f"qadir:event:{thread_id}")
         if not event_data_raw:
             await interaction.followup.send("❌ Event not found.", ephemeral=True)
@@ -274,8 +266,9 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
             f"🎉 Successfully joined **{event_data['name']}**!\n" f"You can now add loot items to this event.", ephemeral=True
         )
 
-    async def _handle_add_loot(self, interaction: discord.Interaction, thread_id: int):
+    async def _handle_loot(self, interaction: discord.Interaction, thread_id: int):
         """Handle adding loot via dropdown selection."""
+
         event_data_raw = await self.bot.redis.get(f"qadir:event:{thread_id}")
         if not event_data_raw:
             await interaction.response.send_message("❌ Event not found.", ephemeral=True)
@@ -292,7 +285,7 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
             return
 
         # Open the add loot modal
-        modal = AddLootModal(event_thread_id=thread_id, title=f"Add Loot to {event_data['name']}")
+        modal = AddLootModal(self, event_thread_id=thread_id, title=f"Add Loot to {event_data['name']}")
         await interaction.response.send_modal(modal)
 
     # Main events command group
@@ -317,9 +310,59 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
     @event.command(description="Join an active event to participate in loot tracking")
     async def join(self, ctx: discord.ApplicationContext) -> None:
         """
-        Join an active event so you can add loot items and participate in distribution.
-        Shows you a list of available events to join.
+        Join an event.
+
+        Args:
+            ctx (discord.ApplicationContext): The context of the command.
         """
+
+        # Check if this is run in an event thread
+        if isinstance(ctx.channel, discord.Thread):
+            thread_id = ctx.channel.id
+            event_data_raw = await self.bot.redis.get(f"qadir:event:{thread_id}")
+
+            if event_data_raw:
+                # This is an event thread
+                event_data = json.loads(event_data_raw)
+
+                # Check if user is already a participant in this event
+                if ctx.author.id in event_data["participants"]:
+                    # User is already in this event
+                    embed = SuccessEmbed(
+                        title="✅ Already in This Event",
+                        description=(
+                            f"You're already participating in **{event_data['name']}**!\n\n"
+                            f"**You can now:**\n"
+                            f"• Use `/event loot` to add items you've collected\n"
+                            f"• Check the event card above for current totals"
+                        ),
+                    )
+                    await ctx.respond(embed=embed, ephemeral=True)
+                    return
+                else:
+                    # User is not in this event, join them directly
+                    await ctx.defer(ephemeral=True)
+
+                    # Add user to participants
+                    event_data["participants"].append(ctx.author.id)
+
+                    # Update Redis
+                    await self.bot.redis.set(f"qadir:event:{thread_id}", json.dumps(event_data))
+
+                    # Update the event card with new participant
+                    await self._update_event_card(event_data)
+
+                    embed = SuccessEmbed(
+                        title="🎉 Successfully Joined Event!",
+                        description=(
+                            f"Welcome to **{event_data['name']}**!\n\n"
+                            f"**You can now:**\n"
+                            f"• Use `/event loot` in this thread to add items\n"
+                            f"• Check the event card above for current totals"
+                        ),
+                    )
+                    await ctx.followup.send(embed=embed, ephemeral=True)
+                    return
 
         await ctx.defer(ephemeral=True)
 
@@ -355,16 +398,48 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
         # Show event selection
         embed = SuccessEmbed(title="🏆 Join an Event", description="Select an event to join from the dropdown below:")
 
-        view = EventSelectionView(all_events, ctx.author.id, "join")
-        await ctx.respond(embed=embed, view=view, ephemeral=True)
+        view = EventSelectionView(self, all_events, ctx.author.id, "join")
+        await ctx.followup.send(embed=embed, view=view, ephemeral=True)
 
     @event.command(description="Add loot items you've collected to an event")
     async def loot(self, ctx: discord.ApplicationContext) -> None:
         """
-        Add loot items you've collected to an event for distribution calculation.
-        Shows you a list of events you're participating in to choose from.
+        Add loot items collected to an event.
+
+        Args:
+            ctx (discord.ApplicationContext): The context of the command.
         """
 
+        # Check if this is run in an event thread
+        if isinstance(ctx.channel, discord.Thread):
+            thread_id = ctx.channel.id
+            event_data_raw = await self.bot.redis.get(f"qadir:event:{thread_id}")
+
+            if event_data_raw:
+                # This is an event thread
+                event_data = json.loads(event_data_raw)
+
+                # Check if user is a participant in this event
+                if ctx.author.id in event_data["participants"]:
+                    # User is in this event, show the add loot modal directly
+                    modal = AddLootModal(self, event_thread_id=thread_id, title=f"Add Loot to {event_data['name']}")
+                    await ctx.send_modal(modal)
+                    return
+                else:
+                    # User is not in this event
+                    embed = ErrorEmbed(
+                        title="❌ Not in This Event",
+                        description=(
+                            f"You're not participating in **{event_data['name']}**.\n\n"
+                            f"**To add loot to this event:**\n"
+                            f"Use `/event join` to join this event first.\n\n"
+                            f"**Or use this command outside the thread** to add loot to other events you're in."
+                        ),
+                    )
+                    await ctx.respond(embed=embed, ephemeral=True)
+                    return
+
+        # Defer the response as no more modals will be sent
         await ctx.defer(ephemeral=True)
 
         # Get user's active events
@@ -376,8 +451,8 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                 description=(
                     "You're not participating in any active events.\n\n"
                     "**To add loot, you need to:**\n"
-                    "1. Use `/events join` to join an existing event\n"
-                    "2. Or use `/events create` to create a new event\n\n"
+                    "1. Use `/event join` to join an existing event\n"
+                    "2. Or use `/event create` to create a new event\n\n"
                     f"**Create events in:** <#{CHANNEL_IDS[0]}>"
                 ),
             )
@@ -387,141 +462,20 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
         # Show event selection for adding loot
         embed = SuccessEmbed(title="🎒 Add Loot to Event", description="Select which event to add your loot items to:")
 
-        view = EventSelectionView(user_events, ctx.author.id, "add_loot")
-        await ctx.respond(embed=embed, view=view, ephemeral=True)
+        view = EventSelectionView(self, user_events, ctx.author.id, "loot")
+        await ctx.followup.send(embed=embed, view=view, ephemeral=True)
 
-    @event.command(description="Show detailed summary of an event with loot distribution")
-    async def summary(self, ctx: discord.ApplicationContext) -> None:
+    @event.command(description="Finalise and close event with final distribution (event creator only)")
+    async def finalise(self, ctx: discord.ApplicationContext) -> None:
         """
-        Show a comprehensive summary of an event including all participants,
-        loot items, and automatic distribution calculations.
-        """
+        Finalise and close an event.
 
-        await ctx.defer(ephemeral=True)
-
-        # Get all active events
-        all_events = await self._get_all_active_events()
-
-        if not all_events:
-            embed = ErrorEmbed(title="❌ No Active Events", description="There are no active events to view summaries for.")
-            await ctx.followup.send(embed=embed, ephemeral=True)
-            return
-
-        # If user is only in one event, show it directly
-        if len(all_events) == 1:
-            await self._handle_event_summary(ctx, all_events[0]["thread_id"])
-            return
-
-        # Show event selection for summary
-        embed = SuccessEmbed(title="📊 View Event Summary", description="Select which event to view the summary for:")
-
-        view = EventSelectionView(all_events, ctx.author.id, "summary")
-        await ctx.respond(embed=embed, view=view, ephemeral=True)
-
-    async def _handle_event_summary(self, interaction, thread_id: int):
-        """Handle showing event summary via dropdown selection."""
-        event_data_raw = await self.bot.redis.get(f"qadir:event:{thread_id}")
-        if not event_data_raw:
-            await interaction.followup.send("❌ Event not found.", ephemeral=True)
-            return
-
-        event_data = json.loads(event_data_raw)
-
-        # Create summary embed
-        embed = discord.Embed(
-            title=f"📊 Event Summary: {event_data['name']}",
-            description=event_data["description"],
-            colour=0x00FF00 if event_data["status"] == "active" else 0xFF0000,
-        )
-
-        # Event info
-        status_emoji = "🟢" if event_data["status"] == "active" else "🔴"
-        embed.add_field(name="Status", value=f"{status_emoji} {event_data['status'].title()}", inline=True)
-        embed.add_field(name="Participants", value=str(len(event_data["participants"])), inline=True)
-        embed.add_field(name="Total Items", value=str(len(event_data["loot_items"])), inline=True)
-
-        # Collect all unique user IDs first (participants + loot contributors)
-        all_user_ids = set(event_data["participants"])
-        if event_data["loot_items"]:
-            for item in event_data["loot_items"]:
-                all_user_ids.add(item["added_by"])
-
-        # Batch fetch all users at once
-        user_cache = {}
-        for user_id in all_user_ids:
-            try:
-                user = self.bot.get_user(user_id)
-                if not user:
-                    user = await self.bot.fetch_user(user_id)
-                user_cache[user_id] = user.display_name
-            except Exception:
-                user_cache[user_id] = f"User {user_id}"
-
-        # Participants list using cached data
-        participants = [user_cache[participant_id] for participant_id in event_data["participants"]]
-        embed.add_field(name="👥 Participants", value=", ".join(participants) if participants else "None", inline=False)
-
-        # Loot items grouped by type
-        if event_data["loot_items"]:
-            loot_summary = defaultdict(int)
-            loot_by_user = defaultdict(list)
-
-            for item in event_data["loot_items"]:
-                loot_summary[item["name"]] += item["quantity"]
-                username = user_cache[item["added_by"]]
-                loot_by_user[username].append(f"{item['quantity']}x {item['name']}")
-
-            # Total loot summary
-            loot_text = []
-            for item_name, total_quantity in sorted(loot_summary.items()):
-                per_person = total_quantity // len(event_data["participants"])
-                remainder = total_quantity % len(event_data["participants"])
-
-                if remainder > 0:
-                    loot_text.append(f"**{total_quantity}x {item_name}** → {per_person} each + {remainder} extra")
-                else:
-                    loot_text.append(f"**{total_quantity}x {item_name}** → {per_person} each")
-
-            embed.add_field(name="🎁 Loot Distribution", value="\n".join(loot_text) if loot_text else "No loot items yet", inline=False)
-
-            # Individual contributions
-            contrib_text = []
-            for username, items in sorted(loot_by_user.items()):
-                contrib_text.append(f"**{username}**: {', '.join(items)}")
-
-            if contrib_text:
-                embed.add_field(name="📝 Individual Contributions", value="\n".join(contrib_text), inline=False)
-        else:
-            embed.add_field(name="🎁 Loot Distribution", value="No loot items added yet", inline=False)
-
-        # Event creator and creation time (use cached data if available, otherwise fetch)
-        creator_id = event_data["creator_id"]
-        if creator_id in user_cache:
-            embed.set_footer(text=f"Created by {user_cache[creator_id]}")
-        else:
-            try:
-                creator = self.bot.get_user(creator_id)
-                if not creator:
-                    creator = await self.bot.fetch_user(creator_id)
-                embed.set_footer(text=f"Created by {creator.display_name}", icon_url=creator.display_avatar.url)
-            except Exception:
-                embed.set_footer(text=f"Created by User {creator_id}")
-
-        created_at = datetime.fromisoformat(event_data["created_at"].replace("Z", "+00:00"))
-        embed.timestamp = created_at
-
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-    @event.command(description="Close and finalize event with final distribution (event creator only)")
-    async def finalize(self, ctx: discord.ApplicationContext) -> None:
-        """
-        Finalize the current event, lock the thread, and show final loot distribution.
-        Only the event creator can use this command.
+        Args:
+            ctx (discord.ApplicationContext): The context of the command.
         """
 
         # Defer immediately to prevent timeout
         await ctx.defer(ephemeral=True)
-        logger.info(f"[FINALIZE] Command started by user {ctx.author.id} in channel {ctx.channel.id}")
 
         # Check if this is an event thread
         if not isinstance(ctx.channel, discord.Thread):
@@ -543,32 +497,27 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
         creator_id = event_data["creator_id"]
         current_user_id = ctx.author.id
 
-        logger.info(
-            f"[FINALIZE] Permission check: creator_id={creator_id} (type: {type(creator_id)}), current_user_id={current_user_id} (type: {type(current_user_id)})"
-        )
-        logger.info(f"[FINALIZE] Comparison result: {current_user_id != creator_id}")
-
         if current_user_id != creator_id:
-            logger.warning(f"[FINALIZE] Permission denied - user {current_user_id} is not creator {creator_id}")
+            logger.warning(f"[FINALISE] Permission Denied - User {current_user_id} Is Not Creator {creator_id}")
             embed = ErrorEmbed(
                 title="❌ Permission Denied",
-                description=f"Only the event creator can finalize the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>",
+                description=f"Only the event creator can finalise the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>",
             )
             await ctx.followup.send(embed=embed, ephemeral=True)
-            logger.info("[FINALIZE] Permission denied message sent, returning early")
             return
 
-        logger.info(f"[FINALIZE] Permission check passed - user {current_user_id} is the creator")
+        logger.info(f"[FINALISE] Permission Check Passed - User {current_user_id} Is The Creator")
 
-        # Check if event is already finalized
+        # Check if event is already finalised
         if event_data["status"] != "active":
+            logger.warning(f"[FINALISE] Event {thread_id} Is Not Active")
             embed = ErrorEmbed(description=f"This event is already {event_data['status']}.")
             await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Update event status
         event_data["status"] = "completed"
-        event_data["finalized_at"] = datetime.now(timezone.utc).isoformat()
+        event_data["finalised_at"] = datetime.now(timezone.utc).isoformat()
 
         # Update Redis
         await self.bot.redis.set(f"qadir:event:{thread_id}", json.dumps(event_data))
@@ -581,7 +530,7 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
             embed.set_field_at(0, name="Status", value="🔴 Completed", inline=True)
             await message.edit(embeds=message.embeds)
         except Exception:
-            logger.exception(f"Failed to update event message for event {thread_id}")
+            logger.exception(f"[FINALISE] Failed To Update Event Message For Event {thread_id}")
 
         # Create dramatic finalization announcement
         if event_data["loot_items"]:
@@ -612,7 +561,7 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
 
             # Create the main announcement embed
             final_embed = discord.Embed(
-                title=f"🏁 EVENT FINALIZED: {event_data['name']}",
+                title=f"🏁 EVENT FINALISED: {event_data['name']}",
                 description="The adventure has concluded! Here's what everyone contributed and earned:",
                 colour=0xFFD700,  # Gold color for dramatic effect
             )
@@ -654,14 +603,14 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
             final_embed.timestamp = datetime.now(timezone.utc)
 
             # Send to the thread
-            await ctx.respond(embed=final_embed, ephemeral=False)
+            await ctx.followup.send(embed=final_embed, ephemeral=False)
 
             # Also send a summary to the main channel
             try:
                 main_channel = await self.bot.fetch_channel(CHANNEL_IDS[0])
                 summary_embed = discord.Embed(
                     title=f"📢 Event Completed: {event_data['name']}",
-                    description=f"Event has been finalized with {len(event_data['participants'])} participants and {len(event_data['loot_items'])} items!",
+                    description=f"Event has been finalised with {len(event_data['participants'])} participants and {len(event_data['loot_items'])} items!",
                     colour=0x00FF00,
                 )
                 summary_embed.add_field(name="Participants", value=", ".join(participant_mentions), inline=False)
@@ -681,7 +630,7 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                 logger.error(f"Failed to send main channel announcement: {e}")
 
         else:
-            await ctx.respond("🏁 Event finalized! No loot was collected during this event.", ephemeral=False)
+            await ctx.followup.send("🏁 Event finalised! No loot was collected during this event.", ephemeral=False)
 
         # Lock the thread
         await ctx.channel.edit(locked=True)
@@ -689,8 +638,13 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
     @event.command(description="Show all events you've created or joined")
     async def list(self, ctx: discord.ApplicationContext) -> None:
         """
-        Display a list of all loot tracking events you've created or are participating in,
-        with their current status and basic statistics.
+        Lists all active events that the user has created or joined.
+        This command retrieves all active events from Redis, categorizes them into events created by the user and events the user has joined,
+        and displays them in an embedded message. If the user has not created or joined any events, a message is shown indicating so.
+        Args:
+            ctx (discord.ApplicationContext): The context of the command invocation.
+        Returns:
+            None
         """
 
         await ctx.defer(ephemeral=True)
@@ -738,12 +692,12 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
         if not user_events and not participated_events:
             embed.description = "You haven't created or joined any events yet."
 
-        await ctx.respond(embed=embed, ephemeral=True)
+        await ctx.followup.send(embed=embed, ephemeral=True)
 
-    @event.command(description="Check your current loot tracking status and get guidance")
+    @event.command(description="Check your current event status and get guidance")
     async def status(self, ctx: discord.ApplicationContext) -> None:
         """
-        Check your current status in the loot tracking system and get helpful guidance
+        Check your current status in the event system and get helpful guidance
         on what commands you can use and where.
         """
 
@@ -772,9 +726,9 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                 name="💡 What you can do:",
                 value=(
                     "• Go to any of your event threads above\n"
-                    "• Use `/add-loot` to add items you've collected\n"
-                    "• Use `/event-summary` to see current totals\n"
-                    "• Use `/finalize-event` if you created the event"
+                    "• Use `/event loot` to add items you've collected\n"
+                    "• Use `/event finalise` to finalise an event you created"
+                    "• Check the event card in the thread for current totals\n"
                 ),
                 inline=False,
             )
@@ -798,159 +752,25 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
         # Add general help
         embed.add_field(name="❓ Need more help?", value="Use `/help` to see all available commands", inline=False)
 
-        await ctx.respond(embed=embed, ephemeral=True)
-
-    @event.command(description="Debug: Check Redis event storage")
-    async def debug(self, ctx: discord.ApplicationContext) -> None:
-        """Debug command to check what events are stored in Redis."""
-        await ctx.defer(ephemeral=True)
-
-        # Get all event IDs from Redis
-        event_ids = await self.bot.redis.smembers("qadir:events")
-
-        debug_info = []
-        debug_info.append(f"**Found {len(event_ids)} event IDs in Redis:**")
-
-        for event_id in event_ids:
-            debug_info.append(f"- Event ID: `{event_id}` (type: {type(event_id)})")
-
-            # Try to get event data
-            event_data_raw = await self.bot.redis.get(f"qadir:event:{event_id}")
-            if event_data_raw:
-                try:
-                    event_data = json.loads(event_data_raw)
-                    debug_info.append(f"  - Name: {event_data.get('name', 'Unknown')}")
-                    debug_info.append(f"  - Status: {event_data.get('status', 'Unknown')}")
-                    debug_info.append(f"  - Participants: {len(event_data.get('participants', []))}")
-                except Exception as e:
-                    debug_info.append(f"  - Error parsing data: {e}")
-            else:
-                debug_info.append("  - No data found for this ID")
-
-        embed = discord.Embed(title="🔍 Redis Debug Info", description="\n".join(debug_info), colour=0xFF0000)
-
-        await ctx.respond(embed=embed, ephemeral=True)
-
-    @event.command(description="Test Redis connection and basic operations")
-    async def test_redis(self, ctx: discord.ApplicationContext) -> None:
-        """Test Redis connection and basic operations."""
-        await ctx.defer(ephemeral=True)
-
-        test_results = []
-        all_passed = True
-
-        try:
-            # Test 1: Basic connection
-            test_results.append("**🔌 Connection Test:**")
-            await self.bot.redis.ping()
-            test_results.append("✅ Redis connection successful")
-        except Exception as e:
-            test_results.append(f"❌ Redis connection failed: {e}")
-            logger.error(f" Connection test failed: {e}")
-            all_passed = False
-
-        try:
-            # Test 2: Write operation
-            test_results.append("\n**✏️ Write Test:**")
-            test_key = "qadir:test:write"
-            test_value = f"test_value_{datetime.now(timezone.utc).timestamp()}"
-            await self.bot.redis.set(test_key, test_value)
-            test_results.append("✅ Successfully wrote test data")
-        except Exception as e:
-            test_results.append(f"❌ Write test failed: {e}")
-            logger.error(f" Write test failed: {e}")
-            all_passed = False
-
-        try:
-            # Test 3: Read operation
-            test_results.append("\n**📖 Read Test:**")
-            retrieved_value = await self.bot.redis.get(test_key)
-            if retrieved_value == test_value:
-                test_results.append("✅ Successfully read test data")
-            else:
-                test_results.append(f"❌ Read test failed: expected {test_value}, got {retrieved_value}")
-                logger.error(f" Read test failed: expected {test_value}, got {retrieved_value}")
-                all_passed = False
-        except Exception as e:
-            test_results.append(f"❌ Read test failed: {e}")
-            logger.error(f" Read test failed: {e}")
-            all_passed = False
-
-        try:
-            # Test 4: Set operations (used for events list)
-            test_results.append("\n**📝 Set Operations Test:**")
-            test_set_key = "qadir:test:set"
-            await self.bot.redis.sadd(test_set_key, "item1", "item2", "item3")
-            set_members = await self.bot.redis.smembers(test_set_key)
-            if len(set_members) == 3:
-                test_results.append("✅ Set operations working correctly")
-            else:
-                test_results.append(f"❌ Set operations failed: expected 3 items, got {len(set_members)}")
-                logger.error(f" Set operations test failed: {set_members}")
-                all_passed = False
-        except Exception as e:
-            test_results.append(f"❌ Set operations test failed: {e}")
-            logger.error(f" Set operations test failed: {e}")
-            all_passed = False
-
-        try:
-            # Test 5: Hash operations (used for event data)
-            test_results.append("\n**🗂️ Hash Operations Test:**")
-            test_hash_key = "qadir:test:hash"
-            await self.bot.redis.hset(test_hash_key, "field1", "value1")
-            await self.bot.redis.hset(test_hash_key, "field2", "value2")
-            retrieved_hash = await self.bot.redis.hget(test_hash_key, "field1")
-            if retrieved_hash == "value1":
-                test_results.append("✅ Hash operations working correctly")
-            else:
-                test_results.append(f"❌ Hash operations failed: expected 'value1', got {retrieved_hash}")
-                logger.error(f" Hash operations test failed: {retrieved_hash}")
-                all_passed = False
-        except Exception as e:
-            test_results.append(f"❌ Hash operations test failed: {e}")
-            logger.error(f" Hash operations test failed: {e}")
-            all_passed = False
-
-        try:
-            # Cleanup test data
-            test_results.append("\n**🧹 Cleanup:**")
-            await self.bot.redis.delete(test_key, test_set_key, test_hash_key)
-            test_results.append("✅ Test data cleaned up")
-        except Exception as e:
-            test_results.append(f"⚠️ Cleanup warning: {e}")
-
-        # Create result embed
-        embed = discord.Embed(
-            title="🔍 Redis Connection Test Results", description="\n".join(test_results), colour=0x00FF00 if all_passed else 0xFF0000
-        )
-
-        if all_passed:
-            embed.add_field(
-                name="✅ Overall Result", value="All Redis tests passed! The database connection is working properly.", inline=False
-            )
-        else:
-            embed.add_field(
-                name="❌ Overall Result", value="Some Redis tests failed. Check the logs for detailed error information.", inline=False
-            )
-
-        await ctx.respond(embed=embed, ephemeral=True)
+        await ctx.followup.send(embed=embed, ephemeral=True)
 
     @event.command(description="Clean up orphaned event data in Redis")
     async def cleanup(self, ctx: discord.ApplicationContext) -> None:
         """Clean up orphaned event data where thread IDs don't match stored data."""
+
         await ctx.defer(ephemeral=True)
 
         try:
             # Get all event IDs
             event_ids = await self.bot.redis.smembers("qadir:events")
-            logger.info(f"[CLEANUP] Found {len(event_ids)} event IDs to check")
+            logger.info(f"[CLEANUP] Found {len(event_ids)} Event IDs To Check")
 
             cleaned_count = 0
             kept_count = 0
 
             for event_id in list(event_ids):  # Convert to list to avoid modification during iteration
                 event_id_str = str(event_id)
-                logger.info(f"[CLEANUP] Checking event {event_id_str}")
+                logger.info(f"[CLEANUP] Checking Event {event_id_str}")
 
                 # Try to get the event data
                 event_data_raw = await self.bot.redis.get(f"qadir:event:{event_id_str}")
@@ -958,7 +778,7 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                 if not event_data_raw:
                     # No data found, remove from events set
                     await self.bot.redis.srem("qadir:events", event_id)
-                    logger.info(f"[CLEANUP] Removed orphaned event ID {event_id_str} from events set")
+                    logger.info(f"[CLEANUP] Removed Orphaned Event ID {event_id_str} From Events Set")
                     cleaned_count += 1
                 else:
                     # Data exists, verify it's valid JSON
@@ -967,17 +787,17 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
                         stored_thread_id = event_data.get("thread_id")
 
                         if str(stored_thread_id) != event_id_str:
-                            logger.warning(f"[CLEANUP] Thread ID mismatch: stored={stored_thread_id}, key={event_id_str}")
+                            logger.warning(f"[CLEANUP] Thread ID Mismatch: stored={stored_thread_id}, key={event_id_str}")
                             # Could fix this by updating the set, but for now just log it
 
-                        logger.info(f"[CLEANUP] Event {event_id_str} is valid (name: {event_data.get('name')})")
+                        logger.info(f"[CLEANUP] Event {event_id_str} Is Valid (name: {event_data.get('name')})")
                         kept_count += 1
 
                     except json.JSONDecodeError:
                         # Invalid JSON, remove both the hash and set entry
                         await self.bot.redis.delete(f"qadir:event:{event_id_str}")
                         await self.bot.redis.srem("qadir:events", event_id)
-                        logger.info(f"[CLEANUP] Removed corrupted event data for {event_id_str}")
+                        logger.info(f"[CLEANUP] Removed Corrupted Event Data For {event_id_str}")
                         cleaned_count += 1
 
             embed = SuccessEmbed(title="🧹 Redis Cleanup Results", description="Cleanup completed successfully!")
@@ -987,17 +807,18 @@ class LootCog(Cog, name="Loot", guild_ids=GUILD_IDS):
             await ctx.followup.send(embed=embed, ephemeral=True)
             logger.info(f"[CLEANUP] Completed: kept={kept_count}, cleaned={cleaned_count}")
 
-        except Exception as e:
-            logger.error(f" Error during cleanup: {e}")
-            embed = discord.Embed(title="❌ Cleanup Failed", description=f"An error occurred during cleanup: {e}", colour=0xFF0000)
+        except Exception:
+            logger.exception("[CLEANUP] Error During Cleanup")
+            embed = discord.Embed(title="❌ Cleanup Failed", description="An error occurred during cleanup", colour=0xFF0000)
             await ctx.followup.send(embed=embed, ephemeral=True)
 
 
 def setup(bot: Qadir) -> None:
     """
-    Load the LootCog into the bot.
+    Load the EventsCog into the bot.
 
-    :param bot: The Qadir instance
+    Args:
+        bot (Qadir): The bot instance to load the cog into.
     """
 
-    bot.add_cog(LootCog(bot))
+    bot.add_cog(EventsCog(bot))

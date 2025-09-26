@@ -13,6 +13,7 @@ UPSTASH_REDIS_REST_TOKEN = os.environ["UPSTASH_REDIS_REST_TOKEN"]
 
 
 class AppConfig(TypedDict):
+    name: str
     version: str
     debug: bool
 
@@ -23,7 +24,7 @@ class ProposalsConfig(TypedDict):
     roles: list[int]
 
 
-class LootConfig(TypedDict):
+class EventsConfig(TypedDict):
     guilds: list[int]
     channels: list[int]
 
@@ -31,7 +32,7 @@ class LootConfig(TypedDict):
 class Config(TypedDict):
     app: AppConfig
     proposals: ProposalsConfig
-    loot: LootConfig
+    events: EventsConfig
 
 
 def load_config() -> Config:

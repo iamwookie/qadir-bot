@@ -13,15 +13,25 @@ logger = logging.getLogger("qadir")
 class UtilityCog(Cog, name="Utility"):
     """A cog for utility commands."""
 
-    @discord.slash_command()
+    @discord.slash_command(description="Ping the application")
     async def ping(self, ctx: discord.ApplicationContext) -> None:
-        """Ping the application"""
+        """
+        Ping the application.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+        """
 
         await ctx.respond("🟢 Pong!", ephemeral=True)
 
-    @discord.slash_command()
+    @discord.slash_command(description="Information about the application")
     async def info(self, ctx: discord.ApplicationContext) -> None:
-        """Information about the application"""
+        """
+        Get information about the application.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+        """
 
         dev_id: int = 244662779745665026
 
@@ -32,9 +42,14 @@ class UtilityCog(Cog, name="Utility"):
 
         await ctx.respond(embed=embed, ephemeral=True)
 
-    @discord.slash_command()
+    @discord.slash_command(description="Get a list of available commands")
     async def help(self, ctx: discord.ApplicationContext) -> None:
-        """Stop it, get some help"""
+        """
+        Get a list of available commands.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+        """
 
         await ctx.defer(ephemeral=True)
 
@@ -42,8 +57,8 @@ class UtilityCog(Cog, name="Utility"):
 
         # Group commands by category for better organization
         utility_commands: list[tuple[str, str]] = []
-        event_commands: list[tuple[str, str]] = []
         proposal_commands: list[tuple[str, str]] = []
+        event_commands: list[tuple[str, str]] = []
         hangar_commands: list[tuple[str, str]] = []
         other_commands: list[tuple[str, str]] = []
 
@@ -60,15 +75,15 @@ class UtilityCog(Cog, name="Utility"):
                     command_desc: str = command.description or "No description provided"
 
                     # Categorize commands based on their cog's qualified_name
-                    if hasattr(command, "cog") and command.cog:
+                    if isinstance(command.cog, discord.Cog):
                         cog_name: str = command.cog.qualified_name.lower()
 
                         if cog_name == "utility":
                             utility_commands.append((command_name, command_desc))
-                        elif cog_name == "loot tracking":
-                            event_commands.append((command_name, command_desc))
                         elif cog_name == "proposals":
                             proposal_commands.append((command_name, command_desc))
+                        elif cog_name == "events":
+                            event_commands.append((command_name, command_desc))
                         elif cog_name == "hangar":
                             hangar_commands.append((command_name, command_desc))
                         else:
@@ -78,33 +93,28 @@ class UtilityCog(Cog, name="Utility"):
 
         # Add commands to embed in organized sections
         if utility_commands:
-            embed.add_field(name="🔧 **Utility Commands**", value="", inline=False)
             for name, desc in utility_commands:
-                embed.add_field(name=name, value=desc, inline=False)
-
-        if event_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
-            embed.add_field(name="🏆 **Loot Tracking Events**", value="", inline=False)
-            for name, desc in event_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if proposal_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
             embed.add_field(name="📋 **Proposal Commands**", value="", inline=False)
             for name, desc in proposal_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+
+        if event_commands:
+            embed.add_field(name="🏆 **Event Commands**", value="", inline=False)
+            for name, desc in event_commands:
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if hangar_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
             embed.add_field(name="🚀 **Hangar Commands**", value="", inline=False)
             for name, desc in hangar_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if other_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
             embed.add_field(name="⚙️ **Other Commands**", value="", inline=False)
             for name, desc in other_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         # Add footer with guild info
         if ctx.guild:
@@ -114,11 +124,16 @@ class UtilityCog(Cog, name="Utility"):
 
         await ctx.followup.send(embed=embed, ephemeral=True)
 
-    @discord.slash_command()
+    @discord.slash_command(description="Find information about a user")
     @discord.option("user_id", str, description="A user to find by ID")
     @commands.cooldown(1, 15.0, commands.BucketType.user)
     async def find(self, ctx: discord.ApplicationContext, user_id: str | None = None) -> None:
-        """Find information about a user"""
+        """Get information about a user.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+            user_id (str | None): The user ID to look up. If None, defaults to the command invoker.
+        """
 
         await ctx.defer(ephemeral=True)
 
@@ -169,7 +184,8 @@ def setup(bot: Qadir) -> None:
     """
     Load the UtilityCog into the bot.
 
-    :param bot: The Qadir instance
+    Args:
+        bot (Qadir): The bot instance to load the cog into.
     """
 
     bot.add_cog(UtilityCog(bot))

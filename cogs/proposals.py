@@ -25,7 +25,8 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
         Initialize the cog and start the proposal processing loop.
 
-        :param bot: The Qadir instance
+        Args:
+            bot (Qadir): The bot instance to load the cog into
         """
 
         super().__init__(bot)
@@ -36,8 +37,10 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
         Restrict commands to users with allowed roles.
 
-        :param ctx: The application context
-        :return: True if user is authorized
+        Args:
+            ctx (discord.ApplicationContext): The application context
+        Returns:
+            bool: True if user has an allowed role, False otherwise
         """
 
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
@@ -46,6 +49,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
     async def process_proposals(self) -> None:
         """
         Process and finalize proposals that are over 24 hours old.
+
         Posts results and locks threads.
         """
 
@@ -100,7 +104,8 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
         Handle errors in the proposal loop.
 
-        :param error: The raised exception
+        Args:
+            error (Exception): The raised exception
         """
 
         logger.error("[TASK] Proposals Processing Error", exc_info=error)
@@ -109,9 +114,10 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
     @commands.has_any_role(*ROLE_IDS)
     async def propose(self, ctx: discord.ApplicationContext) -> None:
         """
-        Submit a proposal via a modal form.
+        Submit a proposal.
 
-        :param ctx: The application context
+        Args:
+            ctx (discord.ApplicationContext): The application context
         """
 
         modal = CreateProposalModal(title="Create a Proposal")
@@ -123,8 +129,9 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
         Fast, live handler for new reactions on cached messages.
 
-        :param reaction: The added reaction
-        :param user: The reacting user
+        Args:
+            reaction (discord.Reaction): The added reaction
+            user (discord.User | discord.Member): The reacting user
         """
         if user.bot:
             return
@@ -136,7 +143,8 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
         Reliable fallback handler for all reactions, even on uncached messages.
 
-        :param payload: The raw reaction event
+        Args:
+            payload (discord.RawReactionActionEvent): The raw reaction event
         """
 
         if payload.user_id == self.bot.user.id:
@@ -155,9 +163,10 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
         Remove conflicting vote emoji if user has already voted oppositely.
 
-        :param message: The message the user reacted to
-        :param user: The user who reacted
-        :param new_emoji: The emoji they just added
+        Args:
+            message (discord.Message): The message the user reacted to
+            user (discord.User): The user who reacted
+            new_emoji (str): The emoji they just added
         """
 
         vote_emojis: dict[str, str] = {"👍": "👎", "👎": "👍"}
@@ -186,7 +195,8 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         Keeps only the last emoji in message.reactions order (assumed latest).
 
-        :param message: The message containing the reactions
+        Args:
+            message (discord.Message): The message to clean up votes on.
         """
 
         try:
@@ -234,7 +244,8 @@ def setup(bot: Qadir) -> None:
     """
     Load the ProposalsCog into the bot.
 
-    :param bot: The Qadir instance
+    Args:
+        bot (Qadir): The bot instance to load the cog into.
     """
 
     bot.add_cog(ProposalsCog(bot))
