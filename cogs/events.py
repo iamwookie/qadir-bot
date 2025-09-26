@@ -808,8 +808,8 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             logger.info(f"[CLEANUP] Completed: kept={kept_count}, cleaned={cleaned_count}")
 
         except Exception:
-            logger.exception(f"[CLEANUP] Error During Cleanup")
-            embed = discord.Embed(title="❌ Cleanup Failed", description=f"An error occurred during cleanup", colour=0xFF0000)
+            logger.exception("[CLEANUP] Error During Cleanup")
+            embed = discord.Embed(title="❌ Cleanup Failed", description="An error occurred during cleanup", colour=0xFF0000)
             await ctx.followup.send(embed=embed, ephemeral=True)
 
 

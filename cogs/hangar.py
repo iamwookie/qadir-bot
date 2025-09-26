@@ -40,11 +40,18 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
+
         self.update_cycle_data.cancel()
         self.update_hangar_embeds.cancel()
 
     async def _fetch_cycle_start(self) -> Optional[int]:
-        """Fetch the cycle start time from contestedzonetimers.com"""
+        """
+        Fetch the cycle start time from contestedzonetimers.com
+
+        Returns:
+            Optional[int]: The cycle start time in milliseconds since epoch, or None if fetch failed
+        """
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get("https://contestedzonetimers.com/lib/cfg.dat") as response:
@@ -61,7 +68,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             return None
 
     def _calculate_hangar_state(self) -> dict:
-        """Calculate current hangar state based on cycle timing."""
+        """
+        Calculate current hangar state based on cycle timing.
+
+        Returns:
+            dict: A dictionary containing hangar state information
+        """
+
         if not self.cycle_start:
             return {
                 "status": "Unknown",
@@ -140,7 +153,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         return f"{hours:02d}:{mins:02d}:{secs:02d}"
 
     def _create_hangar_embed(self, state: dict) -> discord.Embed:
-        """Create the hangar status embed."""
+        """Create the hangar status embed.
+
+        Args:
+            state (dict): The current hangar state information
+        Returns:
+            discord.Embed: The constructed hangar status embed
+        """
 
         embed = discord.Embed(title="🚀 Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc))
 
@@ -243,6 +262,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     @update_hangar_embeds.before_loop
     async def before_update_hangar_embeds(self):
         """Wait for bot to be ready before starting embed updates."""
+
         await self.bot.wait_until_ready()
 
     # Hangar command group
@@ -250,7 +270,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
     @hangar.command(description="Show current executive hangar status with live timer")
     async def show(self, ctx: discord.ApplicationContext) -> None:
-        """Display the current hangar status with a live updating timer."""
+        """
+        Send an embed that displays the current hangar status with a live updating timer.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+        """
+
         await ctx.defer()
 
         try:
@@ -276,9 +302,15 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             logger.exception("[HANGAR] Error Creating Hangar Embed")
             await ctx.followup.send(embed=ErrorEmbed(description="Failed to create hangar timer. Please try again."), ephemeral=True)
 
-    @hangar.command(description="Manually update hangar status embeds")
+    @hangar.command(description="Manually refresh the cycle data")
     async def update(self, ctx: discord.ApplicationContext) -> None:
-        """Manually trigger an update of all hangar status embeds."""
+        """
+        Manually trigger a refresh of the cycle data of all hangar status embeds.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+        """
+
         await ctx.defer(ephemeral=True)
 
         try:
