@@ -109,7 +109,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
     @commands.has_any_role(*ROLE_IDS)
     async def propose(self, ctx: discord.ApplicationContext) -> None:
         """
-        Submit a proposal via a modal form.
+        Submit a proposal.
 
         :param ctx: The application context
         """

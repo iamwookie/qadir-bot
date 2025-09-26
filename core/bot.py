@@ -15,7 +15,10 @@ class Qadir(Bot):
     """A custom Discord bot class for Qadir."""
 
     def __init__(self, *args, **options):
-        logger.info("⏳ Initializing...")
+        name = config["app"]["name"]
+        version = config["app"]["version"]
+
+        logger.info(f"⏳ {name} (v{version}) Initializing...")
 
         # Database
         self.redis = Redis.from_env()
@@ -23,12 +26,10 @@ class Qadir(Bot):
         super().__init__(*args, **options)
 
     async def on_ready(self) -> None:
-        version = config["app"]["version"]
-
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")
 
-        logger.info(f"✅ Logged in: {self.user} (v{version}) ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
+        logger.info(f"✅ Logged in: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
 
     async def on_application_command_error(self, ctx: ApplicationContext, exception: Exception) -> None:
         """

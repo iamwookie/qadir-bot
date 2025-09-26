@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import discord
 
@@ -9,13 +10,17 @@ from core.embeds import ErrorEmbed, SuccessEmbed
 
 logger = logging.getLogger("qadir")
 
+if TYPE_CHECKING:
+    from cogs.events import EventsCog
+
 
 class AddLootModal(discord.ui.Modal):
     """Modal for adding loot items to an event."""
 
-    def __init__(self, event_thread_id: int, *args, **kwargs) -> None:
+    def __init__(self, cog: "EventsCog", event_thread_id: int, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+        self.cog = cog
         self.event_thread_id = event_thread_id
 
         self.add_item(
@@ -89,9 +94,7 @@ class AddLootModal(discord.ui.Modal):
         await client.redis.set(f"qadir:event:{self.event_thread_id}", json.dumps(event_data))
 
         # Update the event card with new loot
-        loot_cog = client.get_cog("LootCog")
-        if loot_cog:
-            await loot_cog._update_event_card(event_data)
+        await self.cog._update_event_card(event_data)
 
-        embed = SuccessEmbed(title="✅ Loot Added Successfully!", description=f"Added **{quantity}x {item_name}** to the event loot!")
+        embed = SuccessEmbed(f"Added **{quantity}x {item_name}** to the event loot!")
         await interaction.followup.send(embed=embed, ephemeral=True)

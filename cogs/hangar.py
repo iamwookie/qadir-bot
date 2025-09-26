@@ -51,13 +51,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                     if response.status == 200:
                         text = await response.text()
                         cycle_start = int(text.strip()) * 1000  # Convert to milliseconds
-                        logger.info(f"[HANGAR] Fetched cycle start: {cycle_start}")
+                        logger.info(f"[HANGAR] Fetched Cycle Start: {cycle_start}")
                         return cycle_start
                     else:
-                        logger.error(f"[HANGAR] Failed to fetch cfg.dat: HTTP {response.status}")
+                        logger.error(f"[HANGAR] Failed To Fetch cfg.dat: HTTP {response.status}")
                         return None
         except Exception as e:
-            logger.error(f"[HANGAR] Error fetching cycle start: {e}")
+            logger.error(f"[HANGAR] Error Fetching Cycle Start: {e}")
             return None
 
     def _calculate_hangar_state(self) -> dict:
@@ -178,9 +178,9 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 self.cycle_start = new_cycle_start
                 # Store in Redis for persistence
                 await self.bot.redis.set("qadir:hangar:cycle_start", str(new_cycle_start))
-                logger.info(f"[HANGAR] Updated cycle start: {new_cycle_start}")
+                logger.info(f"[HANGAR] Updated Cycle Start: {new_cycle_start}")
         except Exception as e:
-            logger.error(f"[HANGAR] Error updating cycle data: {e}")
+            logger.error(f"[HANGAR] Error Updating Cycle Data: {e}")
 
     @update_cycle_data.before_loop
     async def before_update_cycle_data(self):
@@ -193,14 +193,14 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             stored_cycle_start = await self.bot.redis.get("qadir:hangar:cycle_start")
             if stored_cycle_start:
                 self.cycle_start = int(stored_cycle_start)
-                logger.info(f"[HANGAR] Loaded cycle start from Redis: {self.cycle_start}")
+                logger.info(f"[HANGAR] Loaded Cycle Start from Redis: {self.cycle_start}")
             else:
                 # Fetch fresh data
                 self.cycle_start = await self._fetch_cycle_start()
                 if self.cycle_start:
                     await self.bot.redis.set("qadir:hangar:cycle_start", str(self.cycle_start))
         except Exception as e:
-            logger.error(f"[HANGAR] Error initializing cycle data: {e}")
+            logger.error(f"[HANGAR] Error Initializing Cycle Data: {e}")
 
     @tasks.loop(minutes=1)
     async def update_hangar_embeds(self):
@@ -232,13 +232,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                     message = await channel.fetch_message(message_id)
                     await message.edit(embed=embed)
 
-                except Exception as e:
-                    logger.error(f"[HANGAR] Failed to update embed {embed_data_str}: {e}")
+                except Exception:
+                    logger.exception(f"[HANGAR] Failed To Update Embed: {embed_data_str}")
                     # Remove broken embed from tracking
                     await self.bot.redis.srem("qadir:hangar:embeds", embed_data_str)
 
-        except Exception as e:
-            logger.error(f"[HANGAR] Error in update_hangar_embeds: {e}")
+        except Exception:
+            logger.exception("[HANGAR] Error In update_hangar_embeds")
 
     @update_hangar_embeds.before_loop
     async def before_update_hangar_embeds(self):
@@ -270,10 +270,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             }
 
             await self.bot.redis.sadd("qadir:hangar:embeds", json.dumps(embed_data))
-            logger.info(f"[HANGAR] Created hangar timer embed {message.id} in channel {ctx.channel.id}")
+            logger.info(f"[HANGAR] Created Hangar Timer Embed {message.id} in Channel {ctx.channel.id}")
 
-        except Exception as e:
-            logger.error(f"[HANGAR] Error creating hangar embed: {e}")
+        except Exception:
+            logger.exception("[HANGAR] Error Creating Hangar Embed")
             await ctx.followup.send(embed=ErrorEmbed(description="Failed to create hangar timer. Please try again."), ephemeral=True)
 
     @hangar.command(description="Manually update hangar status embeds")
@@ -306,8 +306,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 ephemeral=True,
             )
 
-        except Exception as e:
-            logger.error(f"[HANGAR] Error in manual update: {e}")
+        except Exception:
+            logger.exception("[HANGAR] Error In Manual Update")
             await ctx.followup.send(embed=ErrorEmbed(description="Failed to update hangar timers. Please try again."), ephemeral=True)
 
 

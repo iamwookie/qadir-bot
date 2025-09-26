@@ -42,8 +42,8 @@ class UtilityCog(Cog, name="Utility"):
 
         # Group commands by category for better organization
         utility_commands: list[tuple[str, str]] = []
-        event_commands: list[tuple[str, str]] = []
         proposal_commands: list[tuple[str, str]] = []
+        event_commands: list[tuple[str, str]] = []
         hangar_commands: list[tuple[str, str]] = []
         other_commands: list[tuple[str, str]] = []
 
@@ -60,15 +60,15 @@ class UtilityCog(Cog, name="Utility"):
                     command_desc: str = command.description or "No description provided"
 
                     # Categorize commands based on their cog's qualified_name
-                    if hasattr(command, "cog") and command.cog:
+                    if isinstance(command.cog, discord.Cog):
                         cog_name: str = command.cog.qualified_name.lower()
 
                         if cog_name == "utility":
                             utility_commands.append((command_name, command_desc))
-                        elif cog_name == "loot tracking":
-                            event_commands.append((command_name, command_desc))
                         elif cog_name == "proposals":
                             proposal_commands.append((command_name, command_desc))
+                        elif cog_name == "events":
+                            event_commands.append((command_name, command_desc))
                         elif cog_name == "hangar":
                             hangar_commands.append((command_name, command_desc))
                         else:
@@ -78,33 +78,28 @@ class UtilityCog(Cog, name="Utility"):
 
         # Add commands to embed in organized sections
         if utility_commands:
-            embed.add_field(name="🔧 **Utility Commands**", value="", inline=False)
             for name, desc in utility_commands:
-                embed.add_field(name=name, value=desc, inline=False)
-
-        if event_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
-            embed.add_field(name="🏆 **Loot Tracking Events**", value="", inline=False)
-            for name, desc in event_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if proposal_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
             embed.add_field(name="📋 **Proposal Commands**", value="", inline=False)
             for name, desc in proposal_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+
+        if event_commands:
+            embed.add_field(name="🏆 **Event Commands**", value="", inline=False)
+            for name, desc in event_commands:
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if hangar_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
             embed.add_field(name="🚀 **Hangar Commands**", value="", inline=False)
             for name, desc in hangar_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if other_commands:
-            embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="", inline=False)
             embed.add_field(name="⚙️ **Other Commands**", value="", inline=False)
             for name, desc in other_commands:
-                embed.add_field(name=name, value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         # Add footer with guild info
         if ctx.guild:
