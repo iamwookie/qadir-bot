@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import math
@@ -10,7 +11,7 @@ from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
-from core.embeds import ErrorEmbed, SuccessEmbed
+from core.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
 
 GUILD_IDS: list[int] = config.get("hangar", {}).get("guilds", [])
 
@@ -19,7 +20,7 @@ logger = logging.getLogger("qadir")
 
 class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     """
-    A cog to manage Star Citizen executive hangar timers and tracking.
+    A cog to manage executive hangar timers and tracking.
     Used for timing hangar rentals and managing fleet operations.
     """
 
@@ -35,14 +36,14 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         self.TOTAL_CYCLE = self.RED_PHASE + self.GREEN_PHASE + self.BLACK_PHASE
 
         # Start background tasks
-        self.update_cycle_data.start()
-        self.update_hangar_embeds.start()
+        self.process_cycle_data.start()
+        self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
 
-        self.update_cycle_data.cancel()
-        self.update_hangar_embeds.cancel()
+        self.process_cycle_data.cancel()
+        self.process_hangar_embeds.cancel()
 
     async def _fetch_cycle_start(self) -> Optional[int]:
         """
@@ -58,13 +59,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                     if response.status == 200:
                         text = await response.text()
                         cycle_start = int(text.strip()) * 1000  # Convert to milliseconds
-                        logger.info(f"[HANGAR] Fetched Cycle Start: {cycle_start}")
                         return cycle_start
                     else:
-                        logger.error(f"[HANGAR] Failed To Fetch cfg.dat: HTTP {response.status}")
+                        logger.error(f"[HANGAR] Failed To Fetch Cycle Start: HTTP {response.status}")
                         return None
-        except Exception as e:
-            logger.error(f"[HANGAR] Error Fetching Cycle Start: {e}")
+        except Exception:
+            logger.exception("[HANGAR] Error Fetching Cycle Start")
             return None
 
     def _calculate_hangar_state(self) -> dict:
@@ -107,8 +107,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 "color": 0xFF0000,
                 "lights": lights,
                 "time_left": self._format_time(red_time),
-                "phase_description": f"Opens in {self._format_time(red_time)}",
-                "mini_timer": f"Opens in {self._format_time(red_time)}",
+                "phase_description": f"Opens in `{self._format_time(red_time)}`",
             }
 
         # Handle green phase (lights turn black left to right every 12 minutes)
@@ -127,8 +126,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 "color": 0x32CD32,
                 "lights": lights,
                 "time_left": self._format_time(green_time),
-                "phase_description": f"Resets in {self._format_time(green_time)}",
-                "mini_timer": f"Resets in {self._format_time(green_time)}",
+                "phase_description": f"Resets in `{self._format_time(green_time)}`",
             }
 
         # Handle black phase (all lights black for 5 minutes)
@@ -140,7 +138,6 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 "lights": lights,
                 "time_left": self._format_time(time_left),
                 "phase_description": "Hangar is resetting...",
-                "mini_timer": "",
             }
 
     def _format_time(self, seconds: int) -> str:
@@ -152,89 +149,44 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         return f"{hours:02d}:{mins:02d}:{secs:02d}"
 
-    def _create_hangar_embed(self, state: dict) -> discord.Embed:
-        """Create the hangar status embed.
-
-        Args:
-            state (dict): The current hangar state information
-        Returns:
-            discord.Embed: The constructed hangar status embed
-        """
-
-        embed = discord.Embed(title="🚀 Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc))
-
-        # Status field
-        embed.add_field(name="🎯 Current Status", value=f"**{state['status']}**", inline=True)
-
-        # Timer field
-        embed.add_field(name="⏰ Time Remaining", value=f"`{state['time_left']}`", inline=True)
-
-        # Phase description
-        embed.add_field(name="📋 Phase Info", value=state["phase_description"], inline=True)
-
-        # Light status (visual indicator)
-        lights_display = " ".join(state["lights"])
-        embed.add_field(name="💡 Hangar Lights", value=lights_display, inline=False)
-
-        # Add explanation
-        if state["status"] == "Hangar Closed":
-            embed.add_field(name="ℹ️ Red Phase", value="Lights turn green every 24 minutes as hangar opening approaches.", inline=False)
-        elif state["status"] == "Hangar Open":
-            embed.add_field(name="ℹ️ Green Phase", value="Lights turn black every 12 minutes as reset approaches.", inline=False)
-        elif state["status"] == "Hangar Resetting":
-            embed.add_field(name="ℹ️ Black Phase", value="All systems resetting. Hangar will reopen soon.", inline=False)
-
-        embed.set_footer(text="Data from contestedzonetimers.com")
-        return embed
-
     @tasks.loop(hours=24)
-    async def update_cycle_data(self):
+    async def process_cycle_data(self):
         """Update cycle start data every day."""
+
+        logger.info("⌛ [HANGAR] Processing Cycle Data...")
 
         try:
             new_cycle_start = await self._fetch_cycle_start()
             if new_cycle_start:
                 self.cycle_start = new_cycle_start
-                # Store in Redis for persistence
-                await self.bot.redis.set("qadir:hangar:cycle_start", str(new_cycle_start))
-                logger.info(f"[HANGAR] Updated Cycle Start: {new_cycle_start}")
-        except Exception as e:
-            logger.error(f"[HANGAR] Error Updating Cycle Data: {e}")
+                logger.info(f"⌛ [HANGAR] Processed Cycle Start: {new_cycle_start}")
+        except Exception:
+            logger.exception("[HANGAR] Error Processing Cycle Data")
 
-    @update_cycle_data.before_loop
-    async def before_update_cycle_data(self):
+    @process_cycle_data.before_loop
+    async def before_process_cycle_data(self):
         """Initialize cycle data before starting the loop."""
 
         await self.bot.wait_until_ready()
 
-        # Try to load from Redis first
-        try:
-            stored_cycle_start = await self.bot.redis.get("qadir:hangar:cycle_start")
-            if stored_cycle_start:
-                self.cycle_start = int(stored_cycle_start)
-                logger.info(f"[HANGAR] Loaded Cycle Start from Redis: {self.cycle_start}")
-            else:
-                # Fetch fresh data
-                self.cycle_start = await self._fetch_cycle_start()
-                if self.cycle_start:
-                    await self.bot.redis.set("qadir:hangar:cycle_start", str(self.cycle_start))
-        except Exception as e:
-            logger.error(f"[HANGAR] Error Initializing Cycle Data: {e}")
-
     @tasks.loop(minutes=1)
-    async def update_hangar_embeds(self):
+    async def process_hangar_embeds(self):
         """Update all tracked hangar embeds every minute."""
+
+        logger.debug("⌛ [HANGAR] Processing Hangar Embeds...")
 
         try:
             # Get all tracked embed message IDs
             embed_ids = await self.bot.redis.smembers("qadir:hangar:embeds")
 
             if not embed_ids:
+                logger.debug("⌛ [HANGAR] No Hangar Embeds To Process")
                 return
 
             # Calculate current state
             state = self._calculate_hangar_state()
-            embed = self._create_hangar_embed(state)
+            embed = HangarEmbed(state)
+            processed = 0
 
             # Update each tracked embed
             for embed_data_str in embed_ids:
@@ -251,24 +203,32 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                     message = await channel.fetch_message(message_id)
                     await message.edit(embed=embed)
 
+                    processed += 1
+
                 except Exception:
-                    logger.exception(f"[HANGAR] Failed To Update Embed: {embed_data_str}")
+                    logger.exception(f"[HANGAR] Failed To Process Embed: {embed_data_str}")
                     # Remove broken embed from tracking
                     await self.bot.redis.srem("qadir:hangar:embeds", embed_data_str)
-
         except Exception:
-            logger.exception("[HANGAR] Error In update_hangar_embeds")
+            logger.exception("[HANGAR] Error In process_hangar_embeds")
 
-    @update_hangar_embeds.before_loop
-    async def before_update_hangar_embeds(self):
+        logger.debug(f"⌛ [HANGAR] Processed {processed} Hangar Embeds")
+
+    @process_hangar_embeds.before_loop
+    async def before_process_hangar_embeds(self):
         """Wait for bot to be ready before starting embed updates."""
 
         await self.bot.wait_until_ready()
 
-    # Hangar command group
-    hangar = discord.SlashCommandGroup("hangar", "Manage Star Citizen executive hangar operations")
+        # Wait for process_cycle_data to fetch initial data
+        while not self.cycle_start:
+            logger.debug("⌛ [HANGAR] Waiting For Cycle Data...")
+            await asyncio.sleep(5)
 
-    @hangar.command(description="Show current executive hangar status with live timer")
+    # Hangar command group
+    hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
+
+    @hangar.command(description="Create a hangar status embed with a live timer that auto-updates")
     async def show(self, ctx: discord.ApplicationContext) -> None:
         """
         Send an embed that displays the current hangar status with a live updating timer.
@@ -282,7 +242,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         try:
             # Calculate current state
             state = self._calculate_hangar_state()
-            embed = self._create_hangar_embed(state)
+            embed = HangarEmbed(state)
 
             # Send the embed
             message = await ctx.followup.send(embed=embed)
@@ -297,7 +257,6 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
             await self.bot.redis.sadd("qadir:hangar:embeds", json.dumps(embed_data))
             logger.info(f"[HANGAR] Created Hangar Timer Embed {message.id} in Channel {ctx.channel.id}")
-
         except Exception:
             logger.exception("[HANGAR] Error Creating Hangar Embed")
             await ctx.followup.send(embed=ErrorEmbed(description="Failed to create hangar timer. Please try again."), ephemeral=True)
@@ -323,13 +282,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 return
 
             # Manually trigger the update task
-            await self.update_hangar_embeds()
+            await self.process_hangar_embeds()
 
             # Also refresh cycle data
             new_cycle_start = await self._fetch_cycle_start()
             if new_cycle_start:
                 self.cycle_start = new_cycle_start
-                await self.bot.redis.set("qadir:hangar:cycle_start", str(new_cycle_start))
 
             await ctx.followup.send(
                 embed=SuccessEmbed(
