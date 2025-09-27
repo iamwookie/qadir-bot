@@ -37,7 +37,7 @@ class HangarEmbed(discord.Embed):
         super().__init__(title="Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc), **kwargs)
 
         # Author field
-        self.set_author(name="Provided by: https://exec.xyxll.com", url="https://exec.xyxll.com")
+        self.set_author(name="Provided by: exec.xyxyll.com", url="https://exec.xyxll.com")
 
         # Status field
         self.add_field(name="🎯 Current Status", value=f"**{state['status']}**", inline=True)
