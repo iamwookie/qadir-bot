@@ -10,7 +10,7 @@ from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
 
-GUILD_IDS: list[int] = config.get("hangar", {}).get("guilds", [])
+GUILD_IDS: list[int] = config["hangar"]["guilds"]
 
 logger = logging.getLogger("qadir")
 
