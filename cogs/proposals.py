@@ -58,7 +58,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         Posts results and locks threads.
         """
 
-        logger.info("⌛ [PROPOSALS] Running Proposals Processing...")
+        logger.info("⌛ [PROPOSALS] Processing Proposals...")
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
         proposals = [json.loads(p) for p in proposals]
