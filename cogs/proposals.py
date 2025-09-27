@@ -33,6 +33,11 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         self.process_proposals.start()
 
+    def cog_unload(self):
+        """Clean up tasks when cog is unloaded."""
+
+        self.process_proposals.cancel()
+
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
         """
         Restrict commands to users with allowed roles.
@@ -48,19 +53,21 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
         """
-        Process and finalize proposals that are over 24 hours old.
+        Process and finalize proposals that are over a day old.
 
         Posts results and locks threads.
         """
 
-        logger.info("⌛ Running proposals processing...")
+        logger.info("⌛ [PROPOSALS] Running Proposals Processing...")
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
         proposals = [json.loads(p) for p in proposals]
 
         if not proposals:
-            logger.info("⌛ No proposals to process.")
+            logger.info("⌛ [PROPOSALS] No Proposals To Process")
             return
+
+        processed = 0
 
         for data in proposals:
             try:
@@ -83,13 +90,15 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
                 await thread.edit(locked=True)
 
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
+
+                processed += 1
             except discord.NotFound:
                 logger.warning(f"[TASK] Proposal {data['thread_id']} Not Found")
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except Exception:
                 logger.exception(f"[TASK] Error Processing Proposal {data['thread_id']}")
 
-        logger.info(f"⌛ Processed {len(proposals)} proposals.")
+        logger.info(f"⌛ [PROPOSALS] Processed {processed} Proposals")
 
     @process_proposals.before_loop
     async def before_process_proposals(self) -> None:
