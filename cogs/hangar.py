@@ -1,11 +1,8 @@
-import asyncio
 import json
 import logging
 import math
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
-import aiohttp
 import discord
 from discord.ext import tasks
 
@@ -27,118 +24,122 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     def __init__(self, bot: Qadir) -> None:
         super().__init__(bot)
 
-        self.cycle_start: Optional[int] = None
+        # New timing constants from exec.xyxll.com
+        self.OPEN_DURATION = 3900375  # milliseconds
+        self.CLOSE_DURATION = 7200692  # milliseconds
+        self.CYCLE_DURATION = self.OPEN_DURATION + self.CLOSE_DURATION
 
-        # Timer phases (in seconds)
-        self.RED_PHASE = 2 * 60 * 60  # 2 hours
-        self.GREEN_PHASE = 1 * 60 * 60  # 1 hour
-        self.BLACK_PHASE = 5 * 60  # 5 minutes
-        self.TOTAL_CYCLE = self.RED_PHASE + self.GREEN_PHASE + self.BLACK_PHASE
+        # Original Timestamp: 2025-09-21T00:04:27.222-04:00 (EDT, UTC-4)
+        eastern_tz = timezone(timedelta(hours=-4))
+        initial_time_edt = datetime(2025, 9, 21, 0, 4, 27, 222000, eastern_tz)
+        self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
 
         # Start background tasks
-        self.process_cycle_data.start()
         self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
 
-        self.process_cycle_data.cancel()
         self.process_hangar_embeds.cancel()
 
-    async def _fetch_cycle_start(self) -> Optional[int]:
+    def _get_next_status_change(self, current_time: datetime) -> dict:
         """
-        Fetch the cycle start time from contestedzonetimers.com
+        Get the next status change information based on the timing system.
+
+        Args:
+            current_time (datetime): The current UTC time
 
         Returns:
-            Optional[int]: The cycle start time in milliseconds since epoch, or None if fetch failed
+            dict: A dictionary containing the next status change information
         """
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get("https://contestedzonetimers.com/lib/cfg.dat") as response:
-                    if response.status == 200:
-                        text = await response.text()
-                        cycle_start = int(text.strip()) * 1000  # Convert to milliseconds
-                        return cycle_start
-                    else:
-                        logger.error(f"[HANGAR] Failed To Fetch Cycle Start: HTTP {response.status}")
-                        return None
-        except Exception:
-            logger.exception("[HANGAR] Error Fetching Cycle Start")
-            return None
+        elapsed_time_since_initial_open = current_time - self.INITIAL_OPEN_TIME
+        elapsed_ms = elapsed_time_since_initial_open.total_seconds() * 1000
+        time_in_current_cycle = elapsed_ms % self.CYCLE_DURATION
+
+        if time_in_current_cycle < self.OPEN_DURATION:
+            # Hangars are online
+            next_change_time = current_time + timedelta(milliseconds=(self.OPEN_DURATION - time_in_current_cycle))
+            return {"status": "ONLINE", "next_change_time": next_change_time}
+        else:
+            # Hangars are offline
+            remaining_close_duration = time_in_current_cycle - self.OPEN_DURATION
+            next_change_time = current_time + timedelta(milliseconds=(self.CLOSE_DURATION - remaining_close_duration))
+            return {"status": "OFFLINE", "next_change_time": next_change_time}
 
     def _calculate_hangar_state(self) -> dict:
         """
-        Calculate current hangar state based on cycle timing.
+        Calculate current hangar state based on the new exec.xyxll.com timing system.
 
         Returns:
             dict: A dictionary containing hangar state information
         """
 
-        if not self.cycle_start:
-            return {
-                "status": "Unknown",
-                "color": 0x808080,
-                "lights": ["⚫"] * 5,
-                "time_left": "Unknown",
-                "phase_description": "Waiting for cycle data...",
-            }
+        current_time = datetime.now(timezone.utc)
+        status_info = self._get_next_status_change(current_time)
 
-        # Calculate elapsed time and remaining time in current cycle
-        elapsed = math.floor((datetime.now().timestamp() * 1000 - self.cycle_start) / 1000)
-        remaining = self.TOTAL_CYCLE - (elapsed % self.TOTAL_CYCLE)
-        time_left = remaining
+        # Calculate time in current cycle
+        elapsed_time_since_initial_open = current_time - self.INITIAL_OPEN_TIME
+        elapsed_ms = elapsed_time_since_initial_open.total_seconds() * 1000
+        time_in_cycle = elapsed_ms % self.CYCLE_DURATION
 
-        lights = ["⚫"] * 5  # Default to black lights
+        # Define the thresholds
+        thresholds = [
+            {"min": 0, "max": 12 * 60 * 1000, "colors": ["green", "green", "green", "green", "green"]},  # Online 5G
+            {"min": 12 * 60 * 1000, "max": 24 * 60 * 1000, "colors": ["green", "green", "green", "green", "empty"]},  # Online 4G1E
+            {"min": 24 * 60 * 1000, "max": 36 * 60 * 1000, "colors": ["green", "green", "green", "empty", "empty"]},  # Online 3G2E
+            {"min": 36 * 60 * 1000, "max": 48 * 60 * 1000, "colors": ["green", "green", "empty", "empty", "empty"]},  # Online 2G3E
+            {"min": 48 * 60 * 1000, "max": 60 * 60 * 1000, "colors": ["green", "empty", "empty", "empty", "empty"]},  # Online 1G4E
+            {"min": 60 * 60 * 1000, "max": 65 * 60 * 1000, "colors": ["empty", "empty", "empty", "empty", "empty"]},  # Online 5E
+            {"min": 65 * 60 * 1000, "max": 89 * 60 * 1000, "colors": ["red", "red", "red", "red", "red"]},  # Offline 5R
+            {"min": 89 * 60 * 1000, "max": 113 * 60 * 1000, "colors": ["green", "red", "red", "red", "red"]},  # Offline 1G4R
+            {"min": 113 * 60 * 1000, "max": 137 * 60 * 1000, "colors": ["green", "green", "red", "red", "red"]},  # Offline 2G3R
+            {"min": 137 * 60 * 1000, "max": 161 * 60 * 1000, "colors": ["green", "green", "green", "red", "red"]},  # Offline 3G2R
+            {"min": 161 * 60 * 1000, "max": 185 * 60 * 1000, "colors": ["green", "green", "green", "green", "red"]},  # Offline 4G1R
+        ]
 
-        # Handle red phase (lights turn green left to right every 24 minutes)
-        if time_left > self.GREEN_PHASE + self.BLACK_PHASE:
-            red_time = time_left - (self.GREEN_PHASE + self.BLACK_PHASE)
-            time_since_red_started = self.RED_PHASE - red_time
+        # Find which threshold we're in
+        current_threshold = None
+        for threshold in thresholds:
+            if time_in_cycle >= threshold["min"] and time_in_cycle < threshold["max"]:
+                current_threshold = threshold
+                break
 
-            for i in range(5):
-                if time_since_red_started >= (i + 1) * 24 * 60:  # Green after its time has passed
-                    lights[i] = "🟢"
-                else:
-                    lights[i] = "🔴"
+        # If no threshold found, we're beyond the defined ranges
+        if not current_threshold:
+            # This handles the case where time_in_cycle >= 185*60*1000 (11100000ms)
+            # The cycle is 11101067ms, so we need to handle the last 1067ms
+            # Use the last threshold pattern (4G1R) for the remainder
+            current_threshold = thresholds[-1]
 
-            return {
-                "status": "Hangar Closed",
-                "color": 0xFF0000,
-                "lights": lights,
-                "time_left": self._format_time(red_time),
-                "phase_description": f"Opens in `{self._format_time(red_time)}`",
-            }
+        # Convert colors to emoji exactly as in the original
+        lights = []
+        for color in current_threshold["colors"]:
+            if color == "green":
+                lights.append("🟢")
+            elif color == "red":
+                lights.append("🔴")
+            else:  # empty
+                lights.append("⚫")
 
-        # Handle green phase (lights turn black left to right every 12 minutes)
-        elif time_left > self.BLACK_PHASE:
-            green_time = time_left - self.BLACK_PHASE
-            time_since_green_started = self.GREEN_PHASE - green_time
+        # Calculate time remaining until next change
+        time_remaining: timedelta = status_info["next_change_time"] - current_time
+        remaining_seconds = int(time_remaining.total_seconds())
 
-            for i in range(5):
-                if time_since_green_started >= (i + 1) * 12 * 60:  # Each turns black at 12, 24, 36, 48, 60 min
-                    lights[i] = "⚫"
-                else:
-                    lights[i] = "🟢"
-
-            return {
-                "status": "Hangar Open",
-                "color": 0x32CD32,
-                "lights": lights,
-                "time_left": self._format_time(green_time),
-                "phase_description": f"Resets in `{self._format_time(green_time)}`",
-            }
-
-        # Handle black phase (all lights black for 5 minutes)
+        # Determine status and color based on online/offline
+        if status_info["status"] == "ONLINE":
+            status = "Hangar Open"
+            color = 0x32CD32  # Green
         else:
-            lights = ["⚫"] * 5
-            return {
-                "status": "Hangar Resetting",
-                "color": 0xFFFF00,
-                "lights": lights,
-                "time_left": self._format_time(time_left),
-                "phase_description": "Hangar is resetting...",
-            }
+            status = "Hangar Closed"
+            color = 0xFF0000  # Red
+
+        return {
+            "status": status,
+            "color": color,
+            "lights": lights,
+            "time_left": self._format_time(remaining_seconds),
+        }
 
     def _format_time(self, seconds: int) -> str:
         """Format seconds as HH:MM:SS."""
@@ -148,26 +149,6 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         secs = seconds % 60
 
         return f"{hours:02d}:{mins:02d}:{secs:02d}"
-
-    @tasks.loop(hours=24)
-    async def process_cycle_data(self):
-        """Update cycle start data every day."""
-
-        logger.info("⌛ [HANGAR] Processing Cycle Data...")
-
-        try:
-            new_cycle_start = await self._fetch_cycle_start()
-            if new_cycle_start:
-                self.cycle_start = new_cycle_start
-                logger.info(f"⌛ [HANGAR] Processed Cycle Start: {new_cycle_start}")
-        except Exception:
-            logger.exception("[HANGAR] Error Processing Cycle Data")
-
-    @process_cycle_data.before_loop
-    async def before_process_cycle_data(self):
-        """Initialize cycle data before starting the loop."""
-
-        await self.bot.wait_until_ready()
 
     @tasks.loop(minutes=1)
     async def process_hangar_embeds(self):
@@ -219,11 +200,6 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         """Wait for bot to be ready before starting embed updates."""
 
         await self.bot.wait_until_ready()
-
-        # Wait for process_cycle_data to fetch initial data
-        while not self.cycle_start:
-            logger.debug("⌛ [HANGAR] Waiting For Cycle Data...")
-            await asyncio.sleep(5)
 
     # Hangar command group
     hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
@@ -284,15 +260,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             # Manually trigger the update task
             await self.process_hangar_embeds()
 
-            # Also refresh cycle data
-            new_cycle_start = await self._fetch_cycle_start()
-            if new_cycle_start:
-                self.cycle_start = new_cycle_start
-
             await ctx.followup.send(
-                embed=SuccessEmbed(
-                    title="✅ Update Complete", description=f"Successfully updated {embed_count} hangar timer(s) and refreshed cycle data."
-                ),
+                embed=SuccessEmbed(title="✅ Update Complete", description=f"Successfully updated {embed_count} hangar timer(s)."),
                 ephemeral=True,
             )
 

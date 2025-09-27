@@ -34,29 +34,33 @@ class HangarEmbed(discord.Embed):
             state (dict): The current hangar state information
         """
 
-        super().__init__(
-            title="🚀 Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc), **kwargs
-        )
+        super().__init__(title="Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc), **kwargs)
+
+        # Author field
+        self.set_author(name="Provided by: https://exec.xyxll.com", url="https://exec.xyxll.com")
 
         # Status field
         self.add_field(name="🎯 Current Status", value=f"**{state['status']}**", inline=True)
 
-        # Timer field
-        self.add_field(name="⏰ Time Remaining", value=f"`{state['time_left']}`", inline=True)
+        # Timer field - make it clear this is time until next change
+        self.add_field(name="⏰ Time Until Next Change", value=f"`{state['time_left']}`", inline=True)
 
-        # Phase description
-        self.add_field(name="📋 Phase Info", value=state["phase_description"], inline=True)
-
-        # Light status (visual indicator)
+        # LED lights status (visual indicator)
         lights_display = " ".join(state["lights"])
-        self.add_field(name="💡 Hangar Lights", value=lights_display, inline=False)
+        self.add_field(name="💡 LED Status", value=lights_display, inline=False)
 
-        # Add explanation
+        # Add explanation based on new timing system
         if state["status"] == "Hangar Closed":
-            self.add_field(name="ℹ️ Red Phase", value="Lights turn green every 24 minutes as hangar opening approaches.", inline=False)
+            self.add_field(
+                name="ℹ️ Offline Phase",
+                value="Executive hangars are currently offline. LED progression indicates time until reopening.",
+                inline=False,
+            )
         elif state["status"] == "Hangar Open":
-            self.add_field(name="ℹ️ Green Phase", value="Lights turn black every 12 minutes as reset approaches.", inline=False)
-        elif state["status"] == "Hangar Resetting":
-            self.add_field(name="ℹ️ Black Phase", value="All systems resetting. Hangar will reopen soon.", inline=False)
+            self.add_field(
+                name="ℹ️ Online Phase",
+                value="Executive hangars are operational! LED progression shows time remaining until closure.",
+                inline=False,
+            )
 
-        self.set_footer(text="Data from contestedzonetimers.com")
+        self.set_footer(text="Updated for Star Citizen Patch 4.3.1-LIVE (Ver 10275505)")
