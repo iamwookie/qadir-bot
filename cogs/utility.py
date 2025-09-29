@@ -66,11 +66,22 @@ class UtilityCog(Cog, name="Utility"):
         for command in self.bot.walk_application_commands():
             # Check if command is available in current guild
             command_is_available = True
-            if hasattr(command, "guild_ids") and command.guild_ids:
-                command_is_available = ctx.guild and ctx.guild.id in command.guild_ids
 
-            if command_is_available:
-                if isinstance(command, discord.SlashCommand):
+            if isinstance(command, discord.SlashCommand):
+                # For subcommands, check parent group's guild_ids if the command itself doesn't have them
+                if hasattr(command, "guild_ids") and command.guild_ids:
+                    command_is_available = ctx.guild and ctx.guild.id in command.guild_ids
+
+                # If the command doesn't have guild_ids but its parent does, use parent's guild_ids
+                # NOTE: We use isinstance here due to type checking not picking up correct type for 'parent'
+                if (
+                    isinstance(command.parent, discord.SlashCommandGroup)
+                    and hasattr(command.parent, "guild_ids")
+                    and command.parent.guild_ids
+                ):
+                    command_is_available = ctx.guild and ctx.guild.id in command.parent.guild_ids
+
+                if command_is_available:
                     command_name: str = f"/{command.qualified_name}"
                     command_desc: str = command.description or "No description provided"
 

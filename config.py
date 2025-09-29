@@ -28,8 +28,10 @@ class EventsConfig(TypedDict):
     guilds: list[int]
     channels: list[int]
 
+
 class HangarConfig(TypedDict):
     guilds: list[int]
+
 
 class Config(TypedDict):
     app: AppConfig
