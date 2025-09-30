@@ -188,8 +188,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
                 except Exception:
                     logger.exception(f"[HANGAR] Failed To Process Embed: {embed_data_str}")
-                    # Remove broken embed from tracking
-                    await self.bot.redis.srem("qadir:hangar:embeds", embed_data_str)
+                    # NOTE: Disabled for now. Remove broken embed from tracking
+                    # await self.bot.redis.srem("qadir:hangar:embeds", embed_data_str)
         except Exception:
             logger.exception("[HANGAR] Error In process_hangar_embeds")
 
