@@ -120,7 +120,6 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         logger.error("[TASK] Proposals Processing Error", exc_info=error)
 
     @discord.slash_command()
-    @commands.has_any_role(*ROLE_IDS)
     async def propose(self, ctx: discord.ApplicationContext) -> None:
         """
         Submit a proposal.

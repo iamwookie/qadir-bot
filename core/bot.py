@@ -1,7 +1,8 @@
 import logging
 
 from discord import ApplicationContext, Bot
-from discord.ext import commands
+from discord.errors import CheckFailure
+from discord.ext.commands import CommandOnCooldown
 from upstash_redis.asyncio import Redis
 
 from config import config
@@ -40,10 +41,10 @@ class Qadir(Bot):
         """
 
         try:
-            if isinstance(exception, (commands.MissingRole, commands.MissingAnyRole)):
+            if isinstance(exception, CheckFailure):
                 embed = ErrorEmbed(description="You do not have permission to use this command")
                 await ctx.respond(embed=embed, ephemeral=True)
-            elif isinstance(exception, commands.CommandOnCooldown):
+            elif isinstance(exception, CommandOnCooldown):
                 embed = ErrorEmbed(description=f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds")
                 await ctx.respond(embed=embed, ephemeral=True)
             else:
