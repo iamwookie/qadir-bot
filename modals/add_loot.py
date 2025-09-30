@@ -17,22 +17,31 @@ if TYPE_CHECKING:
 class AddLootModal(discord.ui.Modal):
     """Modal for adding loot items to an event."""
 
-    def __init__(self, cog: "EventsCog", event_thread_id: int, *args, **kwargs) -> None:
+    def __init__(self, cog: "EventsCog", thread_id: int, event_data: dict, items_data: list[dict], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.cog = cog
-        self.event_thread_id = event_thread_id
+        self.thread_id = thread_id
+        self.event_data = event_data
+        self.items_data = items_data
 
         self.add_item(
-            discord.ui.InputText(
-                label="Item Name",
-                style=discord.InputTextStyle.short,
-                required=True,
-                placeholder="e.g., Dragon Sword, Gold Coins, Magic Potion",
+            discord.ui.Select(
+                select_type=discord.ComponentType.string_select,
+                label="Select an item",
+                description="Choose an item to add to the event loot",
+                min_values=1,
+                max_values=1,
+                options=[discord.SelectOption(label=item["name"], value=str(item["id"])) for item in self.items_data],
             )
         )
         self.add_item(
-            discord.ui.InputText(label="Quantity", style=discord.InputTextStyle.short, required=True, placeholder="e.g., 1, 50, 3")
+            discord.ui.InputText(
+                style=discord.InputTextStyle.short,
+                label="Quantity",
+                description="Enter the quantity of the item",
+                placeholder="e.g., 1, 50, 3",
+            )
         )
 
     async def on_error(self, _: discord.Interaction, error: Exception) -> None:
@@ -45,28 +54,30 @@ class AddLootModal(discord.ui.Modal):
 
         client: Qadir = interaction.client
 
-        # Get event data from Redis
-        event_data_raw = await client.redis.get(f"qadir:event:{self.event_thread_id}")
-        if not event_data_raw:
-            embed = ErrorEmbed(description="Event not found or has been deleted.")
-            await interaction.followup.send(embed=embed, ephemeral=True)
-            return
-
-        event_data = json.loads(event_data_raw)
-
         # Check if user is a participant
-        if interaction.user.id not in event_data["participants"]:
+        if interaction.user.id not in self.event_data["participants"]:
             embed = ErrorEmbed(description="You must join the event first using `/events join` before adding loot.")
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # Check if event is active
-        if event_data["status"] != "active":
-            embed = ErrorEmbed(description=f"This event is {event_data['status']} and no longer accepts loot additions.")
+        if self.event_data["status"] != "active":
+            embed = ErrorEmbed(description=f"This event is {self.event_data['status']} and no longer accepts loot additions.")
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        item_name = self.children[0].value.strip()
+        # Get selected item ID from select menu
+        select_menu: discord.ui.Select = self.children[0]
+        selected_item_id = select_menu.values[0]
+
+        # Find the item name from the items list
+        selected_item = next((item for item in self.items_data if str(item["id"]) == selected_item_id), None)
+        if not selected_item:
+            embed = ErrorEmbed(description="Selected item not found.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+
+        item_name = selected_item["name"]
         quantity_str = self.children[1].value.strip()
 
         # Validate quantity
@@ -79,22 +90,22 @@ class AddLootModal(discord.ui.Modal):
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        # Add loot item
-        loot_item = {
-            "id": len(event_data["loot_items"]) + 1,
-            "name": item_name,
+        # Add loot entry
+        loot_entry = {
+            "id": len(self.event_data["loot_entries"]) + 1,
+            "item": selected_item,  # Use the actual item ID from the selected item
             "quantity": quantity,
             "added_by": interaction.user.id,
             "added_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        event_data["loot_items"].append(loot_item)
+        self.event_data["loot_entries"].append(loot_entry)
 
         # Update Redis
-        await client.redis.set(f"qadir:event:{self.event_thread_id}", json.dumps(event_data))
+        await client.redis.set(f"qadir:event:{self.thread_id}", json.dumps(self.event_data))
 
         # Update the event card with new loot
-        await self.cog._update_event_card(event_data)
+        await self.cog._update_event_card(self.event_data)
 
-        embed = SuccessEmbed(f"Added **{quantity}x {item_name}** to the event loot!")
+        embed = SuccessEmbed(title="Loot Added", description=f"Added **{quantity}x {item_name}** to the event loot!")
         await interaction.followup.send(embed=embed, ephemeral=True)
