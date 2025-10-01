@@ -6,12 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
-DISCORD_TOKEN: str = os.environ["DISCORD_TOKEN"]  # type: ignore
-UPSTASH_REDIS_REST_URL: str = os.environ["UPSTASH_REDIS_REST_URL"]  # type: ignore
-UPSTASH_REDIS_REST_TOKEN: str = os.environ["UPSTASH_REDIS_REST_TOKEN"]  # type: ignore
+PYTHON_ENV = os.getenv("PYTHON_ENV", "development")
+DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
+UPSTASH_REDIS_REST_URL = os.environ["UPSTASH_REDIS_REST_URL"]
+UPSTASH_REDIS_REST_TOKEN = os.environ["UPSTASH_REDIS_REST_TOKEN"]
 
 
 class AppConfig(TypedDict):
+    name: str
     version: str
     debug: bool
 
@@ -22,16 +24,26 @@ class ProposalsConfig(TypedDict):
     roles: list[int]
 
 
+class EventsConfig(TypedDict):
+    guilds: list[int]
+    channels: list[int]
+
+
+class HangarConfig(TypedDict):
+    guilds: list[int]
+
+
 class Config(TypedDict):
     app: AppConfig
     proposals: ProposalsConfig
+    events: EventsConfig
+    hangar: HangarConfig
 
 
 def load_config() -> Config:
     """Load the configuration from the appropriate TOML file based on the environment."""
 
-    env = os.getenv("PYTHON_ENV", "development").lower()
-    path = "config.toml" if env == "production" else "config.dev.toml"
+    path = "config.toml" if PYTHON_ENV == "production" else "config.dev.toml"
 
     with open(path, "rb") as f:
         return tomllib.load(f)
