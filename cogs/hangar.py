@@ -204,7 +204,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     # Hangar command group
     hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
 
-    @hangar.command(description="Create a hangar status embed with a live timer that auto-updates")
+    @hangar.command(description="Create an embed to track the executive hangar status")
     async def show(self, ctx: discord.ApplicationContext) -> None:
         """
         Send an embed that displays the current hangar status with a live updating timer.
