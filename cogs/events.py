@@ -443,7 +443,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         modal = AddLootModal(self, thread_id, event_data, items_data, title=f"Add Loot to {event_data['name']}")
         await ctx.send_modal(modal)
 
-    @event.command(description="Finalise and close event with final distribution (event creator only)")
+    @event.command(description="Finalise and close an event you created")
     async def finalise(self, ctx: discord.ApplicationContext) -> None:
         """
         Finalise and close an event.
@@ -495,7 +495,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         # Update event status
         event_data["status"] = "completed"
-        event_data["finalised_at"] = datetime.now(timezone.utc).isoformat()
+        event_data["finalised_at"] = datetime.now(timezone.utc).timestamp()
 
         # Update Redis
         await self.bot.redis.set(f"qadir:event:{thread_id}", json.dumps(event_data))
@@ -690,124 +690,6 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             embed.description = "You haven't created or joined any events yet."
 
         await ctx.followup.send(embed=embed, ephemeral=True)
-
-    @event.command(description="Check your current event status and get guidance")
-    async def status(self, ctx: discord.ApplicationContext) -> None:
-        """
-        Check your current status in the event system and get helpful guidance
-        on what commands you can use and where.
-        """
-
-        await ctx.defer(ephemeral=True)
-
-        # Get user's active events
-        user_events = await self._get_user_active_events(ctx.author.id)
-
-        embed = discord.Embed(title="🎯 Your Loot Tracking Status", colour=0x00FF00 if user_events else 0xFFFF00)
-
-        if user_events:
-            # User is in events
-            embed.description = f"✅ You're participating in **{len(user_events)}** active event(s)!"
-
-            event_list = []
-            for event in user_events[:5]:  # Show max 5 events
-                try:
-                    thread = await self.bot.fetch_channel(event["thread_id"])
-                    event_list.append(f"🏆 **{event['name']}** - {thread.mention}")
-                except Exception:
-                    event_list.append(f"🏆 **{event['name']}** (Thread not found)")
-
-            embed.add_field(name="📋 Your Active Events", value="\n".join(event_list), inline=False)
-
-            embed.add_field(
-                name="💡 What you can do:",
-                value=(
-                    "• Go to any of your event threads above\n"
-                    "• Use `/event loot` to add items you've collected\n"
-                    "• Use `/event finalise` to finalise an event you created"
-                    "• Check the event card in the thread for current totals\n"
-                ),
-                inline=False,
-            )
-        else:
-            # User not in any events
-            embed.description = "⚠️ You're not participating in any active events."
-            embed.colour = 0xFFFF00
-
-            embed.add_field(
-                name="🚀 How to get started:",
-                value=(
-                    f"**Option 1: Create a new event**\n"
-                    f"• Use `/events create` in <#{CHANNEL_IDS[0]}>\n\n"
-                    f"**Option 2: Join an existing event**\n"
-                    f"• Use `/events join` from anywhere\n"
-                    f"• Select from the dropdown of available events"
-                ),
-                inline=False,
-            )
-
-        # Add general help
-        embed.add_field(name="❓ Need more help?", value="Use `/help` to see all available commands", inline=False)
-
-        await ctx.followup.send(embed=embed, ephemeral=True)
-
-    @event.command(description="Clean up orphaned event data in Redis")
-    async def cleanup(self, ctx: discord.ApplicationContext) -> None:
-        """Clean up orphaned event data where thread IDs don't match stored data."""
-
-        await ctx.defer(ephemeral=True)
-
-        try:
-            # Get all event IDs
-            event_ids = await self.bot.redis.smembers("qadir:events")
-            logger.info(f"[CLEANUP] Found {len(event_ids)} Event IDs To Check")
-
-            cleaned_count = 0
-            kept_count = 0
-
-            for event_id in list(event_ids):  # Convert to list to avoid modification during iteration
-                event_id_str = str(event_id)
-                logger.info(f"[CLEANUP] Checking Event {event_id_str}")
-
-                # Try to get the event data
-                event_data_raw = await self.bot.redis.get(f"qadir:event:{event_id_str}")
-
-                if not event_data_raw:
-                    # No data found, remove from events set
-                    await self.bot.redis.srem("qadir:events", event_id)
-                    logger.info(f"[CLEANUP] Removed Orphaned Event ID {event_id_str} From Events Set")
-                    cleaned_count += 1
-                else:
-                    # Data exists, verify it's valid JSON
-                    try:
-                        event_data = json.loads(event_data_raw)
-                        stored_thread_id = event_data.get("thread_id")
-
-                        if str(stored_thread_id) != event_id_str:
-                            logger.warning(f"[CLEANUP] Thread ID Mismatch: stored={stored_thread_id}, key={event_id_str}")
-                            # Could fix this by updating the set, but for now just log it
-
-                        logger.info(f"[CLEANUP] Event {event_id_str} Is Valid (name: {event_data.get('name')})")
-                        kept_count += 1
-
-                    except json.JSONDecodeError:
-                        # Invalid JSON, remove both the hash and set entry
-                        await self.bot.redis.delete(f"qadir:event:{event_id_str}")
-                        await self.bot.redis.srem("qadir:events", event_id)
-                        logger.info(f"[CLEANUP] Removed Corrupted Event Data For {event_id_str}")
-                        cleaned_count += 1
-
-            embed = SuccessEmbed(title="🧹 Redis Cleanup Results", description="Cleanup completed successfully!")
-            embed.add_field(name="Events Kept", value=str(kept_count), inline=True)
-            embed.add_field(name="Events Cleaned", value=str(cleaned_count), inline=True)
-
-            await ctx.followup.send(embed=embed, ephemeral=True)
-            logger.info(f"[CLEANUP] Completed: kept={kept_count}, cleaned={cleaned_count}")
-
-        except Exception:
-            logger.exception("[CLEANUP] Error During Cleanup")
-            embed = discord.Embed(title="❌ Cleanup Failed", description="An error occurred during cleanup", colour=0xFF0000)
-            await ctx.followup.send(embed=embed, ephemeral=True)
 
 
 def setup(bot: Qadir) -> None:

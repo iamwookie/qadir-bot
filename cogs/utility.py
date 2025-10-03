@@ -62,70 +62,85 @@ class UtilityCog(Cog, name="Utility"):
         hangar_commands: list[tuple[str, str]] = []
         other_commands: list[tuple[str, str]] = []
 
-        # Dynamically fetch all application commands using walk_application_commands
-        for command in self.bot.walk_application_commands():
-            # Check if command is available in current guild
-            command_is_available = True
+        # Iterate through cogs mapping (qualified_name -> cog)
+        for cog_name, cog in self.bot.cogs.items():
+            cog_name_lower = cog_name.lower()
 
-            if isinstance(command, discord.SlashCommand):
-                # For subcommands, check parent group's guild_ids if the command itself doesn't have them
-                if hasattr(command, "guild_ids") and command.guild_ids:
-                    command_is_available = ctx.guild and ctx.guild.id in command.guild_ids
+            # Get all commands from this cog
+            for command in cog.get_commands():
+                if isinstance(command, discord.SlashCommand):
+                    # Handle individual SlashCommands
+                    command_is_available = True
 
-                # If the command doesn't have guild_ids but its parent does, use parent's guild_ids
-                # NOTE: We use isinstance here due to type checking not picking up correct type for 'parent'
-                if (
-                    isinstance(command.parent, discord.SlashCommandGroup)
-                    and hasattr(command.parent, "guild_ids")
-                    and command.parent.guild_ids
-                ):
-                    command_is_available = ctx.guild and ctx.guild.id in command.parent.guild_ids
+                    # Check guild restrictions
+                    if hasattr(command, "guild_ids") and command.guild_ids:
+                        command_is_available = ctx.guild and ctx.guild.id in command.guild_ids
 
-                if command_is_available:
-                    command_name: str = f"/{command.qualified_name}"
-                    command_desc: str = command.description or "No description provided"
+                    if command_is_available:
+                        command_name = f"/{command.qualified_name}"
+                        command_desc = command.description or "No description provided"
 
-                    # Categorize commands based on their cog's qualified_name
-                    if isinstance(command.cog, discord.Cog):
-                        cog_name: str = command.cog.qualified_name.lower()
-
-                        if cog_name == "utility":
+                        # Categorize commands based on cog name
+                        if cog_name_lower == "utility":
                             utility_commands.append((command_name, command_desc))
-                        elif cog_name == "proposals":
+                        elif cog_name_lower == "proposals":
                             proposal_commands.append((command_name, command_desc))
-                        elif cog_name == "events":
+                        elif cog_name_lower == "events":
                             event_commands.append((command_name, command_desc))
-                        elif cog_name == "hangar":
+                        elif cog_name_lower == "hangar":
                             hangar_commands.append((command_name, command_desc))
                         else:
                             other_commands.append((command_name, command_desc))
-                    else:
-                        other_commands.append((command_name, command_desc))
+                elif isinstance(command, discord.SlashCommandGroup):
+                    # Handle SlashCommandGroup and its subcommands
+                    group_available = True
 
-        # Add commands to embed in organized sections
+                    # Check guild restrictions for the group
+                    if hasattr(command, "guild_ids") and command.guild_ids:
+                        group_available = ctx.guild and ctx.guild.id in command.guild_ids
+
+                    if group_available:
+                        # Add subcommands
+                        for subcommand in command.subcommands:
+                            if isinstance(subcommand, discord.SlashCommand):
+                                subcommand_name = f"/{subcommand.qualified_name}"
+                                subcommand_desc = subcommand.description or "No description provided"
+
+                                # Categorize subcommands based on cog name
+                                if cog_name_lower == "utility":
+                                    utility_commands.append((subcommand_name, subcommand_desc))
+                                elif cog_name_lower == "proposals":
+                                    proposal_commands.append((subcommand_name, subcommand_desc))
+                                elif cog_name_lower == "events":
+                                    event_commands.append((subcommand_name, subcommand_desc))
+                                elif cog_name_lower == "hangar":
+                                    hangar_commands.append((subcommand_name, subcommand_desc))
+                                else:
+                                    other_commands.append((subcommand_name, subcommand_desc))
+
         if utility_commands:
             for name, desc in utility_commands:
-                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
 
         if proposal_commands:
             embed.add_field(name="📋 **Proposal Commands**", value="", inline=False)
             for name, desc in proposal_commands:
-                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
 
         if event_commands:
             embed.add_field(name="🏆 **Event Commands**", value="", inline=False)
             for name, desc in event_commands:
-                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
 
         if hangar_commands:
             embed.add_field(name="🚀 **Hangar Commands**", value="", inline=False)
             for name, desc in hangar_commands:
-                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
 
         if other_commands:
-            embed.add_field(name="⚙️ **Other Commands**", value="", inline=False)
+            embed.add_field(name="🔧 **Other Commands**", value="", inline=False)
             for name, desc in other_commands:
-                embed.add_field(name=f"`{name}`", value=desc, inline=False)
+                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
 
         # Add footer with guild info
         if ctx.guild:
