@@ -47,6 +47,11 @@ class HangarEmbed(discord.Embed):
         next_status_change_timestamp = int(next_status_change.timestamp())
         self.add_field(name="⏰ Next Status Change", value=f"<t:{next_status_change_timestamp}:R>", inline=True)
 
+        # Discord timestamp field - shows exact time in user's timezone
+        next_light_change: datetime = state["next_light_change"]
+        next_light_change_timestamp = int(next_light_change.timestamp())
+        self.add_field(name="⏰ Next Light Change", value=f"<t:{next_light_change_timestamp}:R>", inline=True)
+
         # LED lights status (visual indicator)
         lights_display = " ".join(state["lights"])
         self.add_field(name="💡 LED Status", value=lights_display, inline=False)
