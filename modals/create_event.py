@@ -7,6 +7,7 @@ import discord
 
 from core import Qadir
 from core.embeds import ErrorEmbed, SuccessEmbed
+from core.utils import datetime_to_posix
 
 logger = logging.getLogger("qadir")
 
@@ -94,7 +95,7 @@ class CreateEventModal(discord.ui.Modal):
             "description": description,
             "creator_id": user_id,
             "status": EventStatus.ACTIVE.value,
-            "created_at": datetime.now(timezone.utc).timestamp(),
+            "created_at": datetime_to_posix(datetime.now(timezone.utc)),
             "participants": [user_id],  # Creator is automatically a participant
             "loot_entries": [],
         }
