@@ -8,6 +8,7 @@ from discord.ext import tasks
 from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
+from core.utils import datetime_to_posix
 
 GUILD_IDS: list[int] = config["hangar"]["guilds"]
 
@@ -218,7 +219,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         # Update task interval to run at the next light change time
         self.process_hangar_embeds.change_interval(time=[next_light_change.time()])
-        logger.debug(f"⌛ [HANGAR] Processing Hangar Embeds Rescheduled To: {next_light_change.timestamp()}")
+        logger.debug(f"⌛ [HANGAR] Processing Hangar Embeds Rescheduled To: {datetime_to_posix(next_light_change)}")
         logger.debug(f"⌛ [HANGAR] Processed {processed} Hangar Embeds")
 
     @process_hangar_embeds.before_loop
@@ -265,7 +266,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 "channel_id": ctx.channel.id,
                 "message_id": message.id,
                 "created_by": ctx.author.id,
-                "created_at": datetime.now(timezone.utc).timestamp(),
+                "created_at": datetime_to_posix(datetime.now(timezone.utc)),
             }
 
             await self.bot.redis.sadd("qadir:hangar:embeds", json.dumps(embed_data))

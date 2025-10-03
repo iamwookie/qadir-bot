@@ -8,6 +8,7 @@ import discord
 from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed, SuccessEmbed
+from core.utils import datetime_to_posix
 from modals import AddLootModal, CreateEventModal
 
 GUILD_IDS: list[int] = config["events"]["guilds"]
@@ -495,7 +496,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         # Update event status
         event_data["status"] = "completed"
-        event_data["finalised_at"] = datetime.now(timezone.utc).timestamp()
+        event_data["finalised_at"] = datetime_to_posix(datetime.now(timezone.utc))
 
         # Update Redis
         await self.bot.redis.set(f"qadir:event:{thread_id}", json.dumps(event_data))

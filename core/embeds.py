@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 import discord
 
+from core.utils import datetime_to_posix
+
 
 class SuccessEmbed(discord.Embed):
     """
@@ -44,13 +46,11 @@ class HangarEmbed(discord.Embed):
 
         # Discord timestamp field - shows exact time in user's timezone
         next_status_change: datetime = state["next_status_change"]
-        next_status_change_timestamp = int(next_status_change.timestamp())
-        self.add_field(name="⏰ Next Status Change", value=f"<t:{next_status_change_timestamp}:R>", inline=True)
+        self.add_field(name="⏰ Next Status Change", value=f"<t:{datetime_to_posix(next_status_change)}:R>", inline=True)
 
         # Discord timestamp field - shows exact time in user's timezone
         next_light_change: datetime = state["next_light_change"]
-        next_light_change_timestamp = int(next_light_change.timestamp())
-        self.add_field(name="⏰ Next Light Change", value=f"<t:{next_light_change_timestamp}:R>", inline=True)
+        self.add_field(name="⏰ Next Light Change", value=f"<t:{datetime_to_posix(next_light_change)}:R>", inline=True)
 
         # LED lights status (visual indicator)
         lights_display = " ".join(state["lights"])

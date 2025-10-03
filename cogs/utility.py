@@ -6,6 +6,7 @@ from discord.ext import commands
 from config import config
 from core import Cog, Qadir
 from core.embeds import ErrorEmbed
+from core.utils import datetime_to_posix
 
 logger = logging.getLogger("qadir")
 
@@ -178,14 +179,14 @@ class UtilityCog(Cog, name="Utility"):
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="Name", value=f"`{str(user)}`", inline=False)
         embed.add_field(name="User ID", value=f"`{user.id}`", inline=False)
-        embed.add_field(name="Account Created", value=f"<t:{int(user.created_at.timestamp())}:R>", inline=False)
+        embed.add_field(name="Account Created", value=f"<t:{datetime_to_posix(user.created_at)}:R>", inline=False)
 
         if isinstance(ctx.guild, discord.Guild):
             try:
                 member: discord.Member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
 
                 if member and member.joined_at:
-                    embed.add_field(name="Server Joined", value=f"<t:{int(member.joined_at.timestamp())}:R>", inline=False)
+                    embed.add_field(name="Server Joined", value=f"<t:{datetime_to_posix(member.joined_at)}:R>", inline=False)
 
                 if member.roles:
                     roles: list[str] = [role.mention for role in member.roles if role.id != ctx.guild.id]
