@@ -1,6 +1,6 @@
 [project]
 name = "qadir-bot"
-version = "1.1.1"
+version = "1.1.2"
 description = "A modular utility bot for Discord"
 authors = [
     {name = "Bilal",email = "mail@bil.al"}
