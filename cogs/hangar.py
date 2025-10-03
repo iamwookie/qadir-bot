@@ -39,8 +39,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         super().__init__(bot)
 
         # Timing constants from exec.xyxll.com
-        self.OPEN_DURATION = 3900375  # milliseconds
-        self.CLOSE_DURATION = 7200692  # milliseconds
+        self.OPEN_DURATION = 3900385  # milliseconds
+        self.CLOSE_DURATION = 7200711  # milliseconds
         self.CYCLE_DURATION = self.OPEN_DURATION + self.CLOSE_DURATION
 
         # Original Timestamp: 2025-09-21T00:04:27.222-04:00 (EDT, UTC-4)
@@ -108,11 +108,11 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         if current_threshold_index < len(self.THRESHOLDS) - 1:
             # Next change is at the end of current threshold (start of next threshold)
             current_threshold = self.THRESHOLDS[current_threshold_index]
-            time_until_next_change_ms = current_threshold["max"] - time_in_cycle
+            time_until_next_change_ms: float = (current_threshold["max"] - time_in_cycle) + 1000
             return current_time + timedelta(milliseconds=time_until_next_change_ms)
         else:
             # We're in the last threshold, next change is start of next cycle
-            time_until_next_cycle_ms = self.CYCLE_DURATION - time_in_cycle
+            time_until_next_cycle_ms: float = (self.CYCLE_DURATION - time_in_cycle) + 1000
             return current_time + timedelta(milliseconds=time_until_next_cycle_ms)
 
     def _calculate_hangar_state(self) -> dict:
@@ -141,8 +141,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         # If no threshold found, we're beyond the defined ranges
         if not current_threshold:
             # This handles the case where time_in_cycle >= 185*60*1000 (11100000ms)
-            # If the cycle is 11101067ms, we need to handle the last 1067ms
-            # Use the last threshold pattern (4G1R) for the remainder
+            # Use the last threshold to maintain the current state during the gap
             current_threshold = self.THRESHOLDS[-1]
 
         # Convert colors to emojis
