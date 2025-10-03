@@ -495,7 +495,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         # Update event status
         event_data["status"] = "completed"
-        event_data["finalised_at"] = datetime.now(timezone.utc).isoformat()
+        event_data["finalised_at"] = datetime.now(timezone.utc).timestamp()
 
         # Update Redis
         await self.bot.redis.set(f"qadir:event:{thread_id}", json.dumps(event_data))

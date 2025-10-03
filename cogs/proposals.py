@@ -126,9 +126,11 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
                         for u in users:
                             if u.id == user_id:
                                 await reaction.remove(u)
-                                logger.info(f"[CLEANUP] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}.")
+                                logger.info(
+                                    f"[PROPOSALS] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}."
+                                )
         except Exception:
-            logger.exception("[VOTING] Error Cleaning Up Conflicting Votes")
+            logger.exception("[PROPOSALS] Error Cleaning Up Conflicting Votes")
 
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
@@ -138,13 +140,13 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         Posts results and locks threads.
         """
 
-        logger.info("⌛ [PROPOSALS] Processing Proposals...")
+        logger.debug("⌛ [PROPOSALS] Processing Proposals...")
 
         proposals = await self.bot.redis.smembers("qadir:proposals")
         proposals = [json.loads(p) for p in proposals]
 
         if not proposals:
-            logger.info("⌛ [PROPOSALS] No Proposals To Process")
+            logger.debug("⌛ [PROPOSALS] No Proposals To Process")
             return
 
         processed = 0
@@ -173,17 +175,18 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
                 processed += 1
             except discord.NotFound:
-                logger.warning(f"[TASK] Proposal {data['thread_id']} Not Found")
+                logger.warning(f"[TASK] Proposal Thread Not Found: {data['thread_id']}")
+                # Remove the missing thread from tracking
                 await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except Exception:
-                logger.exception(f"[TASK] Error Processing Proposal {data['thread_id']}")
+                logger.exception(f"[TASK] Error Processing Proposal: {data['thread_id']}")
 
-        logger.info(f"⌛ [PROPOSALS] Processed {processed} Proposals")
+        logger.debug(f"⌛ [PROPOSALS] Processed {processed} Proposals")
 
     @process_proposals.before_loop
     async def before_process_proposals(self) -> None:
         """
-        Wait until the bot is ready before running the proposal loop.
+        Wait until the bot is ready before processing proposals.
         """
 
         await self.bot.wait_until_ready()
@@ -191,13 +194,13 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
     @process_proposals.error
     async def process_proposals_error(self, error: Exception) -> None:
         """
-        Handle errors in the proposal loop.
+        Handle errors in the process_proposals loop.
 
         Args:
             error (Exception): The raised exception
         """
 
-        logger.error("[TASK] Proposals Processing Error", exc_info=error)
+        logger.error("⌛ [PROPOSALS] Error Processing Proposals", exc_info=error)
 
     @discord.slash_command(description="Submit a proposal")
     async def propose(self, ctx: discord.ApplicationContext) -> None:

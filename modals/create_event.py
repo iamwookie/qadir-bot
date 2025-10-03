@@ -94,7 +94,7 @@ class CreateEventModal(discord.ui.Modal):
             "description": description,
             "creator_id": user_id,
             "status": EventStatus.ACTIVE.value,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).timestamp(),
             "participants": [user_id],  # Creator is automatically a participant
             "loot_entries": [],
         }

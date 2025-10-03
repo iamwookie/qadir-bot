@@ -96,7 +96,7 @@ class AddLootModal(discord.ui.Modal):
             "item": selected_item,  # Use the actual item ID from the selected item
             "quantity": quantity,
             "added_by": interaction.user.id,
-            "added_at": datetime.now(timezone.utc).isoformat(),
+            "added_at": datetime.now(timezone.utc).timestamp(),
         }
 
         self.event_data["loot_entries"].append(loot_entry)
