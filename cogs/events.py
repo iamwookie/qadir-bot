@@ -221,52 +221,46 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
             # Update the message
             await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
-            logger.info(f"[EVENT-CARD] Successfully Updated Event Card For {event_data['name']}")
-
+            logger.info(f"[EVENTS] Successfully Updated Event Card For {event_data['name']}")
         except Exception:
-            logger.exception("[EVENT-CARD] Failed To Update Event Card")
+            logger.exception("[EVENTS] Failed To Update Event Card")
 
     async def _get_all_active_events(self) -> list:
         """Get all active events."""
 
         try:
-            logger.info("[REDIS] Getting All Event IDs From qadir:events")
             event_ids = await self.bot.redis.smembers("qadir:events")
-            logger.info(f"[REDIS] Found {len(event_ids)} Event IDs: {list(event_ids)}")
+            logger.debug(f"[EVENTS] Found {len(event_ids)} Event IDs: {list(event_ids)}")
 
             active_events = []
 
             for event_id in event_ids:
-                logger.info(f"[REDIS] Fetching Data For Event {event_id} (type: {type(event_id)})")
+                logger.debug(f"[EVENTS] Fetching Data For Event {event_id} (type: {type(event_id)})")
                 # Ensure event_id is a string for consistent key formatting
                 event_id_str = str(event_id) if isinstance(event_id, int) else event_id
                 event_data_raw = await self.bot.redis.get(f"qadir:event:{event_id_str}")
 
                 if not event_data_raw:
-                    logger.warning(f"[REDIS] No Data Found For Event {event_id}")
+                    logger.warning(f"[EVENTS] No Data Found For Event {event_id}")
                     continue
 
                 try:
                     event_data = json.loads(event_data_raw)
-                    logger.info(
-                        f"[REDIS] Event {event_id}: name='{event_data.get('name')}', status='{event_data.get('status')}', participants={len(event_data.get('participants', []))}"
-                    )
 
                     if event_data["status"] == "active":
                         active_events.append(event_data)
-                        logger.info(f"[REDIS] Added Active Event {event_id} To Results")
+                        logger.debug(f"[EVENTS] Added Active Event {event_id} To Results")
                     else:
-                        logger.info(f"[REDIS] Skipping Event {event_id} (status: {event_data['status']})")
+                        logger.info(f"[EVENTS] Skipping Event {event_id} (status: {event_data['status']})")
 
-                except json.JSONDecodeError as e:
-                    logger.error(f"[REDIS] Failed To Parse JSON For Event {event_id}: {e}")
+                except json.JSONDecodeError:
+                    logger.exception(f"[EVENTS] Failed To Parse JSON For Event {event_id}")
                     continue
 
-            logger.info(f"[REDIS] Returning {len(active_events)} Active Events")
+            logger.debug(f"[EVENTS] Returning {len(active_events)} Active Events")
             return active_events
-
         except Exception:
-            logger.exception("[REDIS] Error In _get_all_active_events")
+            logger.exception("[EVENTS] Error Fetching All Active Events")
             return []
 
     # Main events command group
