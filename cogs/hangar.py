@@ -49,7 +49,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         initial_time_edt = datetime(2025, 9, 21, 0, 4, 27, 222000, eastern_tz)
         self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
 
-        # Start background tasks
+        # Start cog tasks
         self.process_hangar_embeds.start()
 
     def cog_unload(self):

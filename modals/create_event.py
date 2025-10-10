@@ -86,17 +86,17 @@ class CreateEventModal(discord.ui.Modal):
         # Store event data in Redis
         thread_id_str = str(thread.id)
         message_id_str = str(message.id)
-        user_id = interaction.user.id
+        user_id_str = str(interaction.user.id)
 
         event_data = {
             "thread_id": thread_id_str,
             "message_id": message_id_str,
             "name": event_name,
             "description": description,
-            "creator_id": user_id,
+            "creator_id": user_id_str,
             "status": EventStatus.ACTIVE.value,
             "created_at": datetime_to_posix(datetime.now(timezone.utc)),
-            "participants": [user_id],  # Creator is automatically a participant
+            "participants": [user_id_str],  # Creator is automatically a participant
             "loot_entries": [],
         }
 
