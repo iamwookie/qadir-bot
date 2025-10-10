@@ -155,7 +155,8 @@ class UtilityCog(Cog, name="Utility"):
     @discord.option("user_id", str, description="A user to find by ID")
     @commands.cooldown(1, 15.0, commands.BucketType.user)
     async def find(self, ctx: discord.ApplicationContext, user_id: str | None = None) -> None:
-        """Get information about a user.
+        """
+        Get information about a user.
 
         Args:
             ctx (discord.ApplicationContext): The application context
@@ -165,14 +166,19 @@ class UtilityCog(Cog, name="Utility"):
         await ctx.defer(ephemeral=True)
 
         user_id_str: str = user_id.strip() if user_id else str(ctx.author.id)
+        not_found_embed = ErrorEmbed(description="User not found")
 
         try:
-            user: discord.User = await self.bot.get_or_fetch_user(int(user_id_str))
+            user: discord.User | None = await self.bot.get_or_fetch_user(int(user_id_str))
         except discord.NotFound:
-            await ctx.respond(embed=ErrorEmbed(description="User not found"), ephemeral=True)
+            await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
         except ValueError:
-            await ctx.respond(embed=ErrorEmbed(description="Invalid user ID provided"), ephemeral=True)
+            await ctx.followup.send(embed=ErrorEmbed(description="Invalid user ID provided"), ephemeral=True)
+            return
+
+        if not user:
+            await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
 
         embed: discord.Embed = discord.Embed(title="User Information", colour=0xFFFFFF)
@@ -204,7 +210,7 @@ class UtilityCog(Cog, name="Utility"):
         if user.bot:
             embed.set_footer(text="⚠️ This user is a bot.")
 
-        await ctx.respond(embed=embed, ephemeral=True)
+        await ctx.followup.send(embed=embed, ephemeral=True)
 
 
 def setup(bot: Qadir) -> None:

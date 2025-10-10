@@ -19,8 +19,8 @@ class ErrorEmbed(discord.Embed):
     A custom embed class for displaying error messages.
     """
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(colour=discord.Colour.red(), **kwargs)
+    def __init__(self, description: str = "Uh Oh. Something went wrong. 😞", **kwargs) -> None:
+        super().__init__(description=description, colour=discord.Colour.red(), **kwargs)
 
 
 class HangarEmbed(discord.Embed):
@@ -36,7 +36,7 @@ class HangarEmbed(discord.Embed):
             state (dict): The current hangar state information
         """
 
-        super().__init__(title="Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc), **kwargs)
+        super().__init__(title="Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc), **kwargs)
 
         # Author field
         self.set_author(name="Provided by: exec.xyxyll.com", url="https://exec.xyxyll.com")

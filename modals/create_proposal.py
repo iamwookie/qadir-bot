@@ -1,15 +1,22 @@
 import json
 import logging
 import re
+from enum import Enum
 
 import discord
 
 from config import config
 from core import Qadir
+from views import VotingView
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 
 logger = logging.getLogger("qadir")
+
+
+class ProposalStatus(Enum):
+    ACTIVE = "active"
+    CLOSED = "closed"
 
 
 class CreateProposalModal(discord.ui.Modal):
@@ -34,6 +41,7 @@ class CreateProposalModal(discord.ui.Modal):
 
         last_thread = channel.threads[-1]
         match = re.search(r"#(\d+)", last_thread.name)
+
         return int(match.group(1)) if match else None
 
     async def callback(self, interaction: discord.Interaction):
@@ -54,16 +62,28 @@ class CreateProposalModal(discord.ui.Modal):
         proposal_embed.add_field(name="Expected Outcome", value=self.children[3].value, inline=False)
         proposal_embed.set_footer(text=interaction.user, icon_url=interaction.user.display_avatar.url)
 
-        poll_embed = discord.Embed(description="Please use the reactions below to cast your vote.")
+        poll_embed = discord.Embed(description="Please use the buttons below to cast your vote.")
+        poll_embed.add_field(name="👍 Upvotes", value="`0`", inline=True)
+        poll_embed.add_field(name="👎 Downvotes", value="`0`", inline=True)
         poll_embed.set_footer(text="Voting will close in 24 hours.")
 
-        message = await thread.send(embeds=[proposal_embed, poll_embed])
-
-        await message.add_reaction("👍")
-        await message.add_reaction("👎")
+        message = await thread.send(embeds=[proposal_embed, poll_embed], view=VotingView(thread_id=thread.id))
 
         client: Qadir = interaction.client
 
-        await client.redis.sadd("qadir:proposals", json.dumps({"thread_id": thread.id, "message_id": message.id}))
+        thread_id_str = str(thread.id)
+        message_id_str = str(message.id)
+        creator_id_str = str(interaction.user.id)
+
+        proposal_data = {
+            "thread_id": thread_id_str,
+            "message_id": message_id_str,
+            "creator_id": creator_id_str,
+            "status": ProposalStatus.ACTIVE.value,
+            "votes": {"upvotes": [], "downvotes": []},
+        }
+
+        await client.redis.set(f"qadir:proposal:{thread_id_str}", json.dumps(proposal_data))
+        await client.redis.sadd("qadir:proposals", thread_id_str)
 
         await interaction.followup.send(f"Your proposal has been created in {thread.mention}.", ephemeral=True)

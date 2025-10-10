@@ -1,6 +1,6 @@
 import logging
 
-from discord import ApplicationContext, Bot
+import discord
 from discord.errors import CheckFailure
 from discord.ext.commands import CommandOnCooldown
 from upstash_redis.asyncio import Redis
@@ -12,7 +12,7 @@ from .embeds import ErrorEmbed
 logger = logging.getLogger("qadir")
 
 
-class Qadir(Bot):
+class Qadir(discord.Bot):
     """A custom Discord bot class for Qadir."""
 
     def __init__(self, *args, **options):
@@ -27,17 +27,22 @@ class Qadir(Bot):
         super().__init__(*args, **options)
 
     async def on_ready(self) -> None:
+        """Called when the bot is ready."""
+
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")
 
+        await self.change_presence(activity=discord.CustomActivity(name=f"🌐 v{config['app']['version']} • /help"))
+
         logger.info(f"✅ Logged in: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
 
-    async def on_application_command_error(self, ctx: ApplicationContext, exception: Exception) -> None:
+    async def on_application_command_error(self, ctx: discord.ApplicationContext, exception: Exception) -> None:
         """
         Handle errors for application commands for the entire application.
 
-        :param ctx: The application context
-        :param exception: The raised exception
+        Args:
+            ctx (discord.ApplicationContext): The application context
+            exception (Exception): The exception that was raised
         """
 
         try:
