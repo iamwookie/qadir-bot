@@ -1,11 +1,12 @@
-import json
 import logging
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import discord
 
-from core import Qadir
 from utils.embeds import ErrorEmbed, SuccessEmbed
+
+if TYPE_CHECKING:
+    from cogs.proposals import ProposalsCog
 
 logger = logging.getLogger("qadir")
 
@@ -20,24 +21,27 @@ class VotingView(discord.ui.View):
     A view for voting that uses buttons instead of reactions.
     """
 
-    def __init__(self, thread_id: int = None, message_id: int = None) -> None:
+    def __init__(self, cog: "ProposalsCog", thread_id: int) -> None:
         super().__init__(timeout=None)
 
+        self.db = cog.db
         self.thread_id = thread_id
-        self.message_id = message_id
         self.votes: Votes | None = None
 
     async def on_error(self, error, _: discord.ui.Item, interaction: discord.Interaction) -> None:
         logger.error("[VOTING] VotingView Error", exc_info=error)
         await interaction.response.send_message(embed=ErrorEmbed(), ephemeral=True)
 
-    async def _fetch_votes(self, bot: Qadir):
-        """Fetch current votes from Redis."""
+    async def fetch_votes(self):
+        """Fetch current votes from the database."""
 
-        proposal_data_raw = await bot.redis.get(f"qadir:proposal:{self.thread_id}")
+        proposal_data = await self.db.find_one({"thread_id": str(self.thread_id)})
 
-        if proposal_data_raw:
-            proposal_data = json.loads(proposal_data_raw)
+        if proposal_data:
+            self.votes: Votes = {
+                "upvotes": set(proposal_data.get("votes", {}).get("upvotes", [])),
+                "downvotes": set(proposal_data.get("votes", {}).get("downvotes", [])),
+            }
 
             self.votes: Votes = {
                 "upvotes": set(proposal_data.get("votes", {}).get("upvotes", [])),
@@ -46,22 +50,14 @@ class VotingView(discord.ui.View):
         else:
             self.votes: Votes = {"upvotes": set(), "downvotes": set()}
 
-    async def _update_redis_votes(self, bot: Qadir):
-        """Update Redis with current vote data."""
+    async def update_votes(self):
+        """Update the database with current vote data."""
 
-        if not self.thread_id:
-            return
-
-        proposal_data_raw = await bot.redis.get(f"qadir:proposal:{self.thread_id}")
-
-        if proposal_data_raw:
-            proposal_data = json.loads(proposal_data_raw)
-
-            # Update the votes in the proposal data
-            proposal_data["votes"] = {"upvotes": list(self.votes["upvotes"]), "downvotes": list(self.votes["downvotes"])}
-
-            # Save updated proposal data back to Redis
-            await bot.redis.set(f"qadir:proposal:{self.thread_id}", json.dumps(proposal_data))
+        # Save updated proposal data back to Redis
+        await self.db.update_one(
+            {"thread_id": str(self.thread_id)},
+            {"$set": {"votes": {"upvotes": list(self.votes["upvotes"]), "downvotes": list(self.votes["downvotes"])}}},
+        )
 
     async def update_embed(self, message: discord.Message):
         """Update the embed in the message to reflect current vote counts."""
@@ -80,7 +76,7 @@ class VotingView(discord.ui.View):
         """Handle upvote button press."""
 
         if not self.votes:
-            await self._fetch_votes(interaction.client)
+            await self.fetch_votes()
 
         user_id = interaction.user.id
 
@@ -97,7 +93,7 @@ class VotingView(discord.ui.View):
             action = "upvoted this proposal. 👍"
 
         # Update Redis with new vote data
-        await self._update_redis_votes(interaction.client)
+        await self.update_votes()
 
         # Update the embed in the message
         if interaction.message:
@@ -110,7 +106,7 @@ class VotingView(discord.ui.View):
         """Handle downvote button press."""
 
         if not self.votes:
-            await self._fetch_votes(interaction.client)
+            await self.fetch_votes()
 
         user_id = interaction.user.id
 
@@ -127,7 +123,7 @@ class VotingView(discord.ui.View):
             action = "downvoted this proposal. 👎"
 
         # Update Redis with new vote data
-        await self._update_redis_votes(interaction.client)
+        await self.update_votes()
 
         # Update the embed in the message
         if interaction.message:

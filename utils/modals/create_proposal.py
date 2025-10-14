@@ -1,14 +1,16 @@
-import json
 import logging
 import re
+from typing import TYPE_CHECKING
 
 import discord
 
 from config import config
-from core import Qadir
 
 from ..enums import ProposalStatus
 from ..views import VotingView
+
+if TYPE_CHECKING:
+    from cogs.proposals import ProposalsCog
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 
@@ -18,8 +20,11 @@ logger = logging.getLogger("qadir")
 class CreateProposalModal(discord.ui.Modal):
     """Modal for creating a proposal."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, cog: "ProposalsCog", *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+
+        self.cog = cog
+        self.db = cog.db
 
         self.add_item(discord.ui.InputText(label="Title", style=discord.InputTextStyle.short, required=True))
         self.add_item(discord.ui.InputText(label="Summary", style=discord.InputTextStyle.long, required=True))
@@ -63,23 +68,17 @@ class CreateProposalModal(discord.ui.Modal):
         poll_embed.add_field(name="👎 Downvotes", value="`0`", inline=True)
         poll_embed.set_footer(text="Voting will close in 24 hours.")
 
-        message = await thread.send(embeds=[proposal_embed, poll_embed], view=VotingView(thread_id=thread.id))
+        message = await thread.send(embeds=[proposal_embed, poll_embed], view=VotingView(self.cog, thread_id=thread.id))
 
-        client: Qadir = interaction.client
-
-        thread_id_str = str(thread.id)
-        message_id_str = str(message.id)
-        creator_id_str = str(interaction.user.id)
-
-        proposal_data = {
-            "thread_id": thread_id_str,
-            "message_id": message_id_str,
-            "creator_id": creator_id_str,
-            "status": ProposalStatus.ACTIVE.value,
-            "votes": {"upvotes": [], "downvotes": []},
-        }
-
-        await client.redis.set(f"qadir:proposal:{thread_id_str}", json.dumps(proposal_data))
-        await client.redis.sadd("qadir:proposals", thread_id_str)
+        await self.db.insert_one(
+            {
+                "thread_id": str(thread.id),
+                "message_id": str(message.id),
+                "creator_id": str(interaction.user.id),
+                "created_at": discord.utils.utcnow(),
+                "status": ProposalStatus.ACTIVE.value,
+                "votes": {"upvotes": [], "downvotes": []},
+            }
+        )
 
         await interaction.followup.send(f"Your proposal has been created in {thread.mention}.", ephemeral=True)

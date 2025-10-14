@@ -1,4 +1,3 @@
-import json
 import logging
 
 import discord
@@ -32,15 +31,18 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
+        # MongoDB collection wrapper
+        self.db = bot.db["proposals"]
+
         # Start cog tasks
-        self.process_proposals.start()
         self.restore_voting_views.start()
+        self.process_proposals.start()
 
-    # def cog_unload(self):
-    #     """Clean up tasks when cog is unloaded."""
+    def cog_unload(self):
+        """Clean up tasks when cog is unloaded."""
 
-    #     self.process_proposals.cancel()
-    #     self.restore_voting_views.cancel()
+        self.restore_voting_views.cancel()
+        self.process_proposals.cancel()
 
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
         """
@@ -54,55 +56,61 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
 
+    async def save_proposal_to_db(self, proposal_data: dict) -> bool:
+        """
+        Save a proposal to MongoDB.
+
+        Args:
+            proposal_data: Dictionary containing proposal information
+
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        try:
+            await self.db.insert_one(proposal_data)
+            logger.debug(f"[PROPOSALS] Saved proposal {proposal_data.get('thread_id')} to MongoDB")
+            return True
+        except Exception as e:
+            logger.error(f"[PROPOSALS] Error saving proposal to MongoDB: {e}")
+            return False
+
     @tasks.loop(count=1)
     async def restore_voting_views(self) -> None:
-        """Restore voting views from Redis on bot startup."""
+        """Restore voting views from MongoDB on bot startup."""
 
         logger.debug("⌛ [PROPOSALS] Restoring Voting Views...")
 
-        # Get all proposal thread IDs from Redis
-        proposal_ids = await self.bot.redis.smembers("qadir:proposals")
+        # Get all active proposals from MongoDB
+        proposals = await self.db.find({"status": ProposalStatus.ACTIVE.value}).to_list()
 
-        if not proposal_ids:
+        if not proposals:
             logger.debug("⌛ [PROPOSALS] No Voting Views To Restore")
             return
 
         restored = 0
 
-        for thread_id_str in proposal_ids:
+        for proposal_data in proposals:
             try:
-                # Get proposal data
-                proposal_data_raw = await self.bot.redis.get(f"qadir:proposal:{thread_id_str}")
-
-                if not proposal_data_raw:
-                    continue
-
-                proposal_data = json.loads(proposal_data_raw)
-
                 # Try to fetch the thread and message
-
-                thread: discord.Thread = await self.bot.fetch_channel(int(proposal_data["thread_id"]))
+                thread: discord.Thread = await self.bot.fetch_channel(proposal_data["thread_id"])
                 if not thread:
                     continue
 
-                message: discord.Message = await thread.fetch_message(int(proposal_data["message_id"]))
+                message: discord.Message = await thread.fetch_message(proposal_data["message_id"])
                 if not message:
                     continue
 
                 # Create and add the view to the message
-                view = VotingView(thread.id)
+                view = VotingView(self, thread.id)
                 self.bot.add_view(view, message_id=message.id)
 
                 restored += 1
             except (discord.NotFound, discord.Forbidden):
-                # Thread or message no longer exists, clean up Redis
-                pipeline = self.bot.redis.multi()
-                pipeline.delete(f"qadir:proposal:{thread_id_str}")
-                pipeline.srem("qadir:proposals", thread_id_str)
-                await pipeline.execute()
-                logger.warning(f"[PROPOSALS] Cleaned Up Non-Existent Proposal: {thread_id_str}")
+                # Thread or message no longer exists, clean up MongoDB
+                await self.db.delete_one({"thread_id": proposal_data["thread_id"]})
+                logger.warning(f"[PROPOSALS] Cleaned Up Non-Existent Proposal: {proposal_data['thread_id']}")
             except Exception:
-                logger.exception(f"[PROPOSALS] Error Restoring View For Proposal: {thread_id_str}")
+                logger.exception(f"[PROPOSALS] Error Restoring View For Proposal: {proposal_data['thread_id']}")
 
         logger.debug(f"⌛ [PROPOSALS] Restored {restored} Voting Views")
 
@@ -133,7 +141,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         logger.debug("⌛ [PROPOSALS] Processing Proposals...")
 
-        proposals = await self.bot.redis.smembers("qadir:proposals")
+        proposals = await self.db.find({"status": ProposalStatus.ACTIVE.value}).to_list()
 
         if not proposals:
             logger.debug("⌛ [PROPOSALS] No Proposals To Process")
@@ -141,16 +149,8 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         processed = 0
 
-        for thread_id_str in proposals:
+        for proposal_data in proposals:
             try:
-
-                proposal_data_raw = await self.bot.redis.get(f"qadir:proposal:{thread_id_str}")
-
-                if not proposal_data_raw:
-                    continue
-
-                proposal_data = json.loads(proposal_data_raw)
-
                 thread: discord.Thread = await self.bot.fetch_channel(proposal_data["thread_id"])
                 message: discord.Message = await thread.fetch_message(proposal_data["message_id"])
 
@@ -170,17 +170,15 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
                 proposal_data["status"] = ProposalStatus.CLOSED.value
 
-                await self.bot.redis.srem("qadir:proposals", thread_id_str)
-                await self.bot.redis.set(f"qadir:proposal:{thread_id_str}", json.dumps(proposal_data))
+                await self.db.update_one({"thread_id": proposal_data["thread_id"]}, {"$set": {"status": ProposalStatus.CLOSED.value}})
 
                 processed += 1
             except (discord.NotFound, discord.Forbidden):
-                # Thread or message no longer exists, clean up Redis
-                await self.bot.redis.delete(f"qadir:proposal:{thread_id_str}")
-                await self.bot.redis.srem("qadir:proposals", thread_id_str)
-                logger.warning(f"[TASK] Cleaned Up Non-Existent Proposal: {thread_id_str}")
+                # Thread or message no longer exists, clean up MongoDB
+                await self.db.delete_one({"thread_id": proposal_data["thread_id"]})
+                logger.warning(f"[TASK] Cleaned Up Non-Existent Proposal: {proposal_data['thread_id']}")
             except Exception:
-                logger.exception(f"[TASK] Error Processing Proposal: {thread_id_str}")
+                logger.exception(f"[TASK] Error Processing Proposal: {proposal_data['thread_id']}")
 
         logger.debug(f"⌛ [PROPOSALS] Processed {processed} Proposals")
 
@@ -212,7 +210,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
             ctx (discord.ApplicationContext): The application context
         """
 
-        modal = CreateProposalModal(title="Create a Proposal")
+        modal = CreateProposalModal(self, title="Create a Proposal")
 
         await ctx.send_modal(modal)
 
