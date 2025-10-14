@@ -7,10 +7,10 @@ from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
-from core.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
-from core.utils import datetime_to_posix
+from utils import dt_to_psx
+from utils.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
 
-GUILD_IDS: list[int] = config["hangar"]["guilds"]
+GUILD_IDS = config["hangar"]["guilds"]
 
 logger = logging.getLogger("qadir")
 
@@ -18,11 +18,12 @@ logger = logging.getLogger("qadir")
 class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     """
     A cog to manage executive hangar timers and tracking.
-    Used for timing hangar rentals and managing fleet operations.
     """
 
+    REDIS_PREFIX: str = "qadir:hangar"
+
     # Define the hangar lights thresholds
-    THRESHOLDS = [
+    THRESHOLDS: list[dict] = [
         {"min": 0, "max": 12 * 60 * 1000, "colors": ["green", "green", "green", "green", "green"]},  # Online 5G
         {"min": 12 * 60 * 1000, "max": 24 * 60 * 1000, "colors": ["green", "green", "green", "green", "empty"]},  # Online 4G1E
         {"min": 24 * 60 * 1000, "max": 36 * 60 * 1000, "colors": ["green", "green", "green", "empty", "empty"]},  # Online 3G2E
@@ -50,7 +51,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
 
         # Start cog tasks
-        self.process_hangar_embeds.start()
+        # self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
@@ -124,7 +125,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             dict: A dictionary containing hangar state information
         """
 
-        current_time = datetime.now(timezone.utc)
+        current_time = discord.utils.utcnow()
         status_info = self._get_next_status_change(current_time)
 
         # Calculate time in current cycle
@@ -181,7 +182,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         logger.debug("⌛ [HANGAR] Processing Hangar Embeds...")
 
         # Get all tracked embed message IDs
-        embed_ids = await self.bot.redis.smembers("qadir:hangar:embeds")
+        embed_ids = await self.redis.smembers(f"{self.REDIS_PREFIX}:embeds")
 
         if not embed_ids:
             logger.debug("⌛ [HANGAR] No Hangar Embeds To Process")
@@ -211,7 +212,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             except discord.NotFound:
                 logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_data_raw}")
                 # Remove the missing embed from tracking
-                await self.bot.redis.srem("qadir:hangar:embeds", embed_data_raw)
+                await self.redis.srem("self.REDIS_PREFIX:embeds", embed_data_raw)
             except Exception:
                 logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_data_raw}")
 
@@ -219,7 +220,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         # Update task interval to run at the next light change time
         self.process_hangar_embeds.change_interval(time=[next_light_change.time()])
-        logger.debug(f"⌛ [HANGAR] Processing Hangar Embeds Rescheduled To: {datetime_to_posix(next_light_change)}")
+        logger.debug(f"⌛ [HANGAR] Processing Hangar Embeds Rescheduled To: {dt_to_psx(next_light_change)}")
         logger.debug(f"⌛ [HANGAR] Processed {processed} Hangar Embeds")
 
     @process_hangar_embeds.before_loop
@@ -266,10 +267,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 "channel_id": ctx.channel.id,
                 "message_id": message.id,
                 "created_by": ctx.author.id,
-                "created_at": datetime_to_posix(datetime.now(timezone.utc)),
+                "created_at": dt_to_psx(discord.utils.utcnow()),
             }
 
-            await self.bot.redis.sadd("qadir:hangar:embeds", json.dumps(embed_data))
+            await self.redis.sadd("self.REDIS_PREFIX:embeds", json.dumps(embed_data))
             logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
         except Exception:
             logger.exception("[HANGAR] Error Creating Hangar Embed")
@@ -288,7 +289,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         try:
             # Get tracked embeds count
-            embed_ids = await self.bot.redis.smembers("qadir:hangar:embeds")
+            embed_ids = await self.redis.smembers("self.REDIS_PREFIX:embeds")
             embed_count = len(embed_ids)
 
             if embed_count == 0:
@@ -312,7 +313,8 @@ def setup(bot: Qadir) -> None:
     """
     Load the HangarCog into the bot.
 
-    :param bot: The Qadir instance
+    Args:
+        bot (Qadir): The bot instance to load the cog into
     """
 
     bot.add_cog(HangarCog(bot))

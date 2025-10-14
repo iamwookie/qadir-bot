@@ -1,21 +1,14 @@
 import json
 import logging
-from datetime import datetime, timezone
-from enum import Enum
 
 import discord
 
 from core import Qadir
-from core.embeds import ErrorEmbed, SuccessEmbed
-from core.utils import datetime_to_posix
+from utils import dt_to_psx
+from utils.embeds import ErrorEmbed, SuccessEmbed
+from utils.enums import EventStatus
 
 logger = logging.getLogger("qadir")
-
-
-class EventStatus(Enum):
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ARCHIVED = "archived"
 
 
 class CreateEventModal(discord.ui.Modal):
@@ -65,7 +58,7 @@ class CreateEventModal(discord.ui.Modal):
         event_embed.add_field(name="⚖️ Distribution Preview", value="*Distribution will be calculated once loot is added.*", inline=False)
 
         event_embed.set_footer(text=f"Created by {interaction.user}", icon_url=interaction.user.display_avatar.url)
-        event_embed.timestamp = datetime.now(timezone.utc)
+        event_embed.timestamp = discord.utils.utcnow()
 
         # Instructions embed
         instructions_embed = discord.Embed(
@@ -95,7 +88,7 @@ class CreateEventModal(discord.ui.Modal):
             "description": description,
             "creator_id": user_id_str,
             "status": EventStatus.ACTIVE.value,
-            "created_at": datetime_to_posix(datetime.now(timezone.utc)),
+            "created_at": dt_to_psx(discord.utils.utcnow()),
             "participants": [user_id_str],  # Creator is automatically a participant
             "loot_entries": [],
         }

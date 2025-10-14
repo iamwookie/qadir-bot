@@ -3,9 +3,10 @@ import logging
 import discord
 from discord.errors import CheckFailure
 from discord.ext.commands import CommandOnCooldown
+from pymongo import AsyncMongoClient
 from upstash_redis.asyncio import Redis
 
-from config import config
+from config import MONGODB_URI, PYTHON_ENV, config
 
 from .embeds import ErrorEmbed
 
@@ -21,8 +22,12 @@ class Qadir(discord.Bot):
 
         logger.info(f"⏳ {name} (v{version}) Initializing...")
 
-        # Database
+        # Redis - Caching and Session Store
         self.redis = Redis.from_env()
+
+        # MongoDB - Database
+        self.mongo = AsyncMongoClient(MONGODB_URI)
+        self.db = self.mongo["qadir-main" if PYTHON_ENV == "production" else "qadir-dev"]
 
         super().__init__(*args, **options)
 

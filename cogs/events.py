@@ -1,18 +1,17 @@
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
 
 import discord
 
 from config import config
 from core import Cog, Qadir
-from core.embeds import ErrorEmbed, SuccessEmbed
-from core.utils import datetime_to_posix
-from modals import AddLootModal, CreateEventModal
+from utils import dt_to_psx
+from utils.embeds import ErrorEmbed, SuccessEmbed
+from utils.modals import AddLootModal, CreateEventModal
 
-GUILD_IDS: list[int] = config["events"]["guilds"]
-CHANNEL_IDS: list[int] = config["events"]["channels"]
+GUILD_IDS = config["events"]["guilds"]
+CHANNEL_IDS = config["events"]["channels"]
 
 logger = logging.getLogger("qadir")
 
@@ -221,6 +220,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
             # Update the message
             await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
+
             logger.info(f"[EVENTS] Successfully Updated Event Card For {event_data['name']}")
         except Exception:
             logger.exception("[EVENTS] Failed To Update Event Card")
@@ -230,9 +230,9 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         try:
             event_ids = await self.bot.redis.smembers("qadir:events")
-            logger.debug(f"[EVENTS] Found {len(event_ids)} Event IDs: {list(event_ids)}")
-
             active_events = []
+
+            logger.debug(f"[EVENTS] Found {len(event_ids)} Event IDs: {list(event_ids)}")
 
             for event_id in event_ids:
                 logger.debug(f"[EVENTS] Fetching Data For Event {event_id} (type: {type(event_id)})")
@@ -490,7 +490,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         # Update event status
         event_data["status"] = "completed"
-        event_data["finalised_at"] = datetime_to_posix(datetime.now(timezone.utc))
+        event_data["finalised_at"] = dt_to_psx(discord.utils.utcnow())
 
         # Update Redis
         await self.bot.redis.set(f"qadir:event:{thread_id}", json.dumps(event_data))
@@ -591,7 +591,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
                 final_embed.add_field(name="🎁 Your Share", value=share_text, inline=False)
 
             final_embed.set_footer(text="Event has been locked. No more changes can be made.")
-            final_embed.timestamp = datetime.now(timezone.utc)
+            final_embed.timestamp = discord.utils.utcnow()
 
             # Send to the thread
             await ctx.followup.send(embed=final_embed, ephemeral=False)
