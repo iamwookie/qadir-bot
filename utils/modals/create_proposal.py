@@ -1,11 +1,12 @@
+import asyncio
 import logging
-import re
 from typing import TYPE_CHECKING
 
 import discord
 
 from config import config
 
+from ..embeds import ErrorEmbed
 from ..enums import ProposalStatus
 from ..views import VotingView
 
@@ -26,24 +27,16 @@ class CreateProposalModal(discord.ui.Modal):
         self.cog = cog
         self.db = cog.db
 
-        self.add_item(discord.ui.InputText(label="Title", style=discord.InputTextStyle.short, required=True))
-        self.add_item(discord.ui.InputText(label="Summary", style=discord.InputTextStyle.long, required=True))
-        self.add_item(discord.ui.InputText(label="Reasoning", style=discord.InputTextStyle.long, required=True))
-        self.add_item(discord.ui.InputText(label="Expected Outcome", style=discord.InputTextStyle.long, required=True))
+        self.add_item(discord.ui.InputText(label="Title", max_length=64, style=discord.InputTextStyle.short, required=True))
+        self.add_item(discord.ui.InputText(label="Summary", max_length=2048, style=discord.InputTextStyle.long, required=True))
+        self.add_item(discord.ui.InputText(label="Reasoning", max_length=2048, style=discord.InputTextStyle.long, required=True))
+        self.add_item(discord.ui.InputText(label="Expected Outcome", max_length=2048, style=discord.InputTextStyle.long, required=True))
+        self.add_item(discord.ui.TextDisplay(content="Additional information may be added in the proposal thread."))
 
-    async def on_error(self, _: discord.Interaction, error: Exception) -> None:
+    # NOTE: The parameters for on_error are incorrectly ordered in the pycord docs
+    async def on_error(self, error: Exception, interaction: discord.Interaction) -> None:
         logger.error("[MODAL] CreateProposalModal Error", exc_info=error)
-
-    def get_last_proposal_number(self, channel: discord.TextChannel) -> int | None:
-        """Get the last proposal number from the channel threads."""
-
-        if not channel.threads:
-            return None
-
-        last_thread = channel.threads[-1]
-        match = re.search(r"#(\d+)", last_thread.name)
-
-        return int(match.group(1)) if match else None
+        await interaction.followup.send(embed=ErrorEmbed(), ephemeral=True)
 
     async def callback(self, interaction: discord.Interaction):
         """Handle the modal submission and create a proposal thread."""
@@ -52,28 +45,32 @@ class CreateProposalModal(discord.ui.Modal):
 
         channel: discord.TextChannel = await interaction.client.fetch_channel(CHANNEL_ID)
 
-        last_number = self.get_last_proposal_number(channel)
-        next_number = last_number + 1 if last_number else 1
-        thread_title = f"Proposal #{next_number} - {self.children[0].value}"
+        length = await self.db.count_documents({})
+        title = f"Proposal #{length + 1} - {self.children[0].value}"
 
-        thread = await channel.create_thread(name=thread_title, type=discord.ChannelType.public_thread)
+        thread = await channel.create_thread(name=title, type=discord.ChannelType.public_thread)
 
-        proposal_embed = discord.Embed(title=thread_title, description=self.children[1].value, colour=0xFFFFFF)
-        proposal_embed.add_field(name="Reasoning", value=self.children[2].value, inline=False)
-        proposal_embed.add_field(name="Expected Outcome", value=self.children[3].value, inline=False)
-        proposal_embed.set_footer(text=interaction.user, icon_url=interaction.user.display_avatar.url)
+        summary_embed = discord.Embed(title=title, description=self.children[1].value)
+        reasoning_embed = discord.Embed(title="Reasoning", description=self.children[2].value)
+        outcome_embed = discord.Embed(title="Expected Outcome", description=self.children[3].value)
+        outcome_embed.set_footer(text=interaction.user, icon_url=interaction.user.display_avatar.url)
 
         poll_embed = discord.Embed(description="Please use the buttons below to cast your vote.")
         poll_embed.add_field(name="👍 Upvotes", value="`0`", inline=True)
         poll_embed.add_field(name="👎 Downvotes", value="`0`", inline=True)
         poll_embed.set_footer(text="Voting will close in 24 hours.")
 
-        message = await thread.send(embeds=[proposal_embed, poll_embed], view=VotingView(self.cog, thread_id=thread.id))
+        result = await asyncio.gather(
+            thread.send(embeds=[summary_embed]),
+            thread.send(embeds=[reasoning_embed]),
+            thread.send(embeds=[outcome_embed]),
+            thread.send(embeds=[poll_embed], view=VotingView(self.cog, thread_id=thread.id)),
+        )
 
         await self.db.insert_one(
             {
                 "thread_id": str(thread.id),
-                "message_id": str(message.id),
+                "message_id": str(result[-1].id),
                 "creator_id": str(interaction.user.id),
                 "created_at": discord.utils.utcnow(),
                 "status": ProposalStatus.ACTIVE.value,
