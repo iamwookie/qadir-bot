@@ -96,7 +96,6 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
         """
 
         activity_id = self.act_to_id(activity_name)
-
         tracked = await self.pop_user_activity(member.id, activity_id)
         if not tracked:
             return  # Not tracking this activity
