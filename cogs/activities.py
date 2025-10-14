@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 
 import discord
 
@@ -157,7 +157,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
                     try:
                         await self.handle_start_activity(after, activity_name)
                     except Exception:
-                        logger.exception(f"[ACTIVITIES] Error Handling Start Activity")
+                        logger.exception("[ACTIVITIES] Error Handling Start Activity")
 
         for activity_name in stopped_activities:
             if self.act_to_id(activity_name) in self.ACTIVITIES:
@@ -166,7 +166,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
                     try:
                         await self.handle_stop_activity(after, activity_name)
                     except Exception:
-                        logger.exception(f"[ACTIVITIES] Error Handling Stop Activity")
+                        logger.exception("[ACTIVITIES] Error Handling Stop Activity")
 
 
 def setup(bot: Qadir) -> None:

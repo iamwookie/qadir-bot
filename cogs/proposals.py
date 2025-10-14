@@ -8,7 +8,7 @@ from config import config
 from core import Cog, Qadir
 from utils.enums import ProposalStatus
 from utils.modals import CreateProposalModal
-from views import VotingView
+from utils.views import VotingView
 
 GUILD_IDS = config["proposals"]["guilds"]
 ROLE_IDS = config["proposals"]["roles"]

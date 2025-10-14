@@ -6,16 +6,13 @@ import discord
 
 from config import config
 from core import Qadir
-from views import VotingView
+
+from ..enums import ProposalStatus
+from ..views import VotingView
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 
 logger = logging.getLogger("qadir")
-
-
-class ProposalStatus(Enum):
-    ACTIVE = "active"
-    CLOSED = "closed"
 
 
 class CreateProposalModal(discord.ui.Modal):
