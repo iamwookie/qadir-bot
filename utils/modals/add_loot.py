@@ -1,13 +1,13 @@
 import json
 import logging
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import discord
 
 from core import Qadir
-from core.embeds import ErrorEmbed, SuccessEmbed
-from core.utils import datetime_to_posix
+
+from utils import dt_to_psx
+from utils.embeds import ErrorEmbed, SuccessEmbed
 
 logger = logging.getLogger("qadir")
 
@@ -97,7 +97,7 @@ class AddLootModal(discord.ui.Modal):
             "item": selected_item,  # Use the actual item ID from the selected item
             "quantity": quantity,
             "added_by": interaction.user.id,
-            "added_at": datetime_to_posix(datetime.now(timezone.utc)),
+            "added_at": dt_to_psx(discord.utils.utcnow()),
         }
 
         self.event_data["loot_entries"].append(loot_entry)

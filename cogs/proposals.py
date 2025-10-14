@@ -1,20 +1,17 @@
 import json
 import logging
-from datetime import datetime, timezone
 
 import discord
 from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
-from modals import CreateProposalModal
-
-# TODO: Seperate ProposalStatus and other types into their own file
-from modals.create_proposal import ProposalStatus
+from utils.enums import ProposalStatus
+from utils.modals import CreateProposalModal
 from views import VotingView
 
-GUILD_IDS: list[int] = config["proposals"]["guilds"]
-ROLE_IDS: list[int] = config["proposals"]["roles"]
+GUILD_IDS = config["proposals"]["guilds"]
+ROLE_IDS = config["proposals"]["roles"]
 
 logger = logging.getLogger("qadir")
 
@@ -99,8 +96,10 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
                 restored += 1
             except (discord.NotFound, discord.Forbidden):
                 # Thread or message no longer exists, clean up Redis
-                await self.bot.redis.delete(f"qadir:proposal:{thread_id_str}")
-                await self.bot.redis.srem("qadir:proposals", thread_id_str)
+                pipeline = self.bot.redis.multi()
+                pipeline.delete(f"qadir:proposal:{thread_id_str}")
+                pipeline.srem("qadir:proposals", thread_id_str)
+                await pipeline.execute()
                 logger.warning(f"[PROPOSALS] Cleaned Up Non-Existent Proposal: {thread_id_str}")
             except Exception:
                 logger.exception(f"[PROPOSALS] Error Restoring View For Proposal: {thread_id_str}")
@@ -155,7 +154,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
                 thread: discord.Thread = await self.bot.fetch_channel(proposal_data["thread_id"])
                 message: discord.Message = await thread.fetch_message(proposal_data["message_id"])
 
-                if (datetime.now(timezone.utc) - message.created_at).total_seconds() < 86400:
+                if (discord.utils.utcnow() - message.created_at).total_seconds() < 86400:
                     continue
 
                 upvotes: int = len(proposal_data["votes"]["upvotes"])

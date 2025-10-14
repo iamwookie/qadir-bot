@@ -5,8 +5,8 @@ from discord.ext import commands
 
 from config import config
 from core import Cog, Qadir
-from core.embeds import ErrorEmbed
-from core.utils import datetime_to_posix
+from utils import dt_to_psx
+from utils.embeds import ErrorEmbed
 
 logger = logging.getLogger("qadir")
 
@@ -34,7 +34,7 @@ class UtilityCog(Cog, name="Utility"):
             ctx (discord.ApplicationContext): The application context
         """
 
-        dev_id: int = 244662779745665026
+        dev_id = 244662779745665026
 
         embed = discord.Embed(title="App Information", description=f"A magical application created by <@{dev_id}>", colour=0x00FF00)
         embed.add_field(name="Version", value=f"`{config['app']['version']}`")
@@ -165,11 +165,11 @@ class UtilityCog(Cog, name="Utility"):
 
         await ctx.defer(ephemeral=True)
 
-        user_id_str: str = user_id.strip() if user_id else str(ctx.author.id)
+        user_id_str = user_id.strip() if user_id else str(ctx.author.id)
         not_found_embed = ErrorEmbed(description="User not found")
 
         try:
-            user: discord.User | None = await self.bot.get_or_fetch_user(int(user_id_str))
+            user = await self.bot.get_or_fetch_user(int(user_id_str))
         except discord.NotFound:
             await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
@@ -181,18 +181,18 @@ class UtilityCog(Cog, name="Utility"):
             await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
 
-        embed: discord.Embed = discord.Embed(title="User Information", colour=0xFFFFFF)
+        embed = discord.Embed(title="User Information", colour=0xFFFFFF)
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="Name", value=f"`{str(user)}`", inline=False)
         embed.add_field(name="User ID", value=f"`{user.id}`", inline=False)
-        embed.add_field(name="Account Created", value=f"<t:{datetime_to_posix(user.created_at)}:R>", inline=False)
+        embed.add_field(name="Account Created", value=f"<t:{dt_to_psx(user.created_at)}:R>", inline=False)
 
         if isinstance(ctx.guild, discord.Guild):
             try:
-                member: discord.Member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
+                member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
 
-                if member and member.joined_at:
-                    embed.add_field(name="Server Joined", value=f"<t:{datetime_to_posix(member.joined_at)}:R>", inline=False)
+                if member.joined_at:
+                    embed.add_field(name="Server Joined", value=f"<t:{dt_to_psx(member.joined_at)}:R>", inline=False)
 
                 if member.roles:
                     roles: list[str] = [role.mention for role in member.roles if role.id != ctx.guild.id]

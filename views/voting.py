@@ -1,11 +1,11 @@
-import discord
 import json
-
 import logging
+from typing import TypedDict
+
+import discord
 
 from core import Qadir
-from core.embeds import SuccessEmbed, ErrorEmbed
-from typing import TypedDict
+from utils.embeds import ErrorEmbed, SuccessEmbed
 
 logger = logging.getLogger("qadir")
 
@@ -28,7 +28,7 @@ class VotingView(discord.ui.View):
         self.votes: Votes | None = None
 
     async def on_error(self, error, _: discord.ui.Item, interaction: discord.Interaction) -> None:
-        logger.error(f"[VOTING] VotingView Error", exc_info=error)
+        logger.error("[VOTING] VotingView Error", exc_info=error)
         await interaction.response.send_message(embed=ErrorEmbed(), ephemeral=True)
 
     async def _fetch_votes(self, bot: Qadir):
@@ -70,8 +70,8 @@ class VotingView(discord.ui.View):
         if not embeds or len(embeds) < 2:
             return
 
-        embeds[1].set_field_at(0, name="👍 Upvotes", value=f"`{len(self.votes["upvotes"])}`", inline=True)
-        embeds[1].set_field_at(1, name="👎 Downvotes", value=f"`{len(self.votes["downvotes"])}`", inline=True)
+        embeds[1].set_field_at(0, name="👍 Upvotes", value=f"`{len(self.votes['upvotes'])}`", inline=True)
+        embeds[1].set_field_at(1, name="👎 Downvotes", value=f"`{len(self.votes['downvotes'])}`", inline=True)
 
         await message.edit(embeds=embeds)
 

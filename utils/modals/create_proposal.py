@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-from enum import Enum
 
 import discord
 

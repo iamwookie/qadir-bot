@@ -12,3 +12,6 @@ class Cog(commands.Cog):
 
     def __init__(self, bot: Qadir) -> None:
         self.bot = bot
+
+        # Redis instance wrapper
+        self.redis = bot.redis
