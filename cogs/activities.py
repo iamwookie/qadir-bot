@@ -29,7 +29,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
 
     REDIS_PREFIX: str = "qadir:activities"
     LOCK_TIMEOUT: int = 3  # seconds
-    ACTIVITIES: list[str] = ["star_citizen", "spotify"]
+    ACTIVITIES: list[str] = ["star_citizen"]
 
     def __init__(self, bot: Qadir) -> None:
         """
