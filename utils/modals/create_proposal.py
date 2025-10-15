@@ -6,7 +6,7 @@ import discord
 
 from config import config
 
-from ..embeds import ErrorEmbed
+from ..embeds import ErrorEmbed, SuccessEmbed
 from ..enums import ProposalStatus
 from ..views import VotingView
 
@@ -44,10 +44,8 @@ class CreateProposalModal(discord.ui.Modal):
         await interaction.response.defer(ephemeral=True)
 
         channel: discord.TextChannel = await interaction.client.fetch_channel(CHANNEL_ID)
-
         length = await self.db.count_documents({})
         title = f"Proposal #{length + 1} - {self.children[0].value}"
-
         thread = await channel.create_thread(name=title, type=discord.ChannelType.public_thread)
 
         summary_embed = discord.Embed(title=title, description=self.children[1].value)
@@ -61,10 +59,10 @@ class CreateProposalModal(discord.ui.Modal):
         poll_embed.set_footer(text="Voting will close in 24 hours.")
 
         result = await asyncio.gather(
-            thread.send(embeds=[summary_embed]),
-            thread.send(embeds=[reasoning_embed]),
-            thread.send(embeds=[outcome_embed]),
-            thread.send(embeds=[poll_embed], view=VotingView(self.cog, thread_id=thread.id)),
+            thread.send(embed=summary_embed),
+            thread.send(embed=reasoning_embed),
+            thread.send(embed=outcome_embed),
+            thread.send(embed=poll_embed, view=VotingView(self.cog, thread_id=thread.id)),
         )
 
         await self.db.insert_one(
@@ -78,4 +76,7 @@ class CreateProposalModal(discord.ui.Modal):
             }
         )
 
-        await interaction.followup.send(f"Your proposal has been created in {thread.mention}.", ephemeral=True)
+        embed = SuccessEmbed(title="Proposal Created", description=f"Your proposal has been created in {thread.mention}.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+        logger.info(f"✅ [PROPOSALS] Proposal Created: {thread.id} ({title})")
