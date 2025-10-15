@@ -35,14 +35,14 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         self.db = bot.db["proposals"]
 
         # Start cog tasks
-        self.restore_voting_views.start()
         self.process_proposals.start()
+        self.restore_voting_views.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
 
-        self.restore_voting_views.cancel()
         self.process_proposals.cancel()
+        self.restore_voting_views.cancel()
 
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
         """
@@ -56,61 +56,6 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
 
-    @tasks.loop(count=1)
-    async def restore_voting_views(self) -> None:
-        """Restore voting views from MongoDB on bot startup."""
-
-        logger.debug("⌛ [PROPOSALS] [0] Restoring Voting Views...")
-
-        # Get all active proposals from MongoDB
-        proposals = await self.db.find({"status": ProposalStatus.ACTIVE.value}).to_list()
-
-        if not proposals:
-            logger.debug("⌛ [PROPOSALS] [0] No Voting Views To Restore")
-            return
-
-        restored = 0
-
-        for proposal_data in proposals:
-            try:
-                # Try to fetch the thread and message
-                thread: discord.Thread = await self.bot.fetch_channel(proposal_data["thread_id"])
-                if not thread:
-                    continue
-
-                message: discord.Message = await thread.fetch_message(proposal_data["message_id"])
-                if not message:
-                    continue
-
-                # Create and add the view to the message
-                view = VotingView(self, thread.id)
-                self.bot.add_view(view, message_id=message.id)
-
-                restored += 1
-            except (discord.NotFound, discord.Forbidden):
-                logger.warning(f"⌛ [PROPOSALS] [0] Proposal Not Found: {proposal_data['thread_id']}")
-            except Exception:
-                logger.exception(f"⌛ [PROPOSALS] [0] Error Restoring View For Proposal: {proposal_data['thread_id']}")
-
-        logger.debug(f"⌛ [PROPOSALS] [0] Restored {restored} Voting Views")
-
-    @restore_voting_views.before_loop
-    async def before_restore_voting_views(self) -> None:
-        """Wait until the bot is ready before restoring voting views."""
-
-        await self.bot.wait_until_ready()
-
-    @restore_voting_views.error
-    async def restore_voting_views_error(self, error: Exception) -> None:
-        """
-        Handle errors in the restore_voting_views loop.
-
-        Args:
-            error (Exception): The raised exception
-        """
-
-        logger.error("⌛ [PROPOSALS] [0] Error Restoring Voting Views", exc_info=error)
-
     @tasks.loop(hours=24)
     async def process_proposals(self) -> None:
         """
@@ -119,12 +64,12 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         Posts results and locks threads.
         """
 
-        logger.debug("⌛ [PROPOSALS] [1] Processing Proposals...")
+        logger.debug("⌛ [PROPOSALS] [0] Processing Proposals...")
 
         proposals = await self.db.find({"status": ProposalStatus.ACTIVE.value}).to_list()
 
         if not proposals:
-            logger.debug("⌛ [PROPOSALS] [1] No Proposals To Process")
+            logger.debug("⌛ [PROPOSALS] [0] No Proposals To Process")
             return
 
         processed = 0
@@ -156,11 +101,11 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
             except (discord.NotFound, discord.Forbidden):
                 # Thread or message no longer exists, clean up MongoDB
                 await self.db.delete_one({"thread_id": proposal_data["thread_id"]})
-                logger.warning(f"⌛ [PROPOSALS] [1] Cleaned Up Non-Existent Proposal: {proposal_data['thread_id']}")
+                logger.warning(f"⌛ [PROPOSALS] [0] Cleaned Up Non-Existent Proposal: {proposal_data['thread_id']}")
             except Exception:
-                logger.exception(f"⌛ [PROPOSALS] [1] Error Processing Proposal: {proposal_data['thread_id']}")
+                logger.exception(f"⌛ [PROPOSALS] [0] Error Processing Proposal: {proposal_data['thread_id']}")
 
-        logger.debug(f"⌛ [PROPOSALS] [1] Processed {processed} Proposals")
+        logger.debug(f"⌛ [PROPOSALS] [0] Processed {processed} Proposals")
 
     @process_proposals.before_loop
     async def before_process_proposals(self) -> None:
@@ -180,6 +125,61 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
 
         logger.error("⌛ [PROPOSALS] Error Processing Proposals", exc_info=error)
+
+    @tasks.loop(count=1)
+    async def restore_voting_views(self) -> None:
+        """Restore voting views from MongoDB on bot startup."""
+
+        logger.debug("⌛ [PROPOSALS] [1] Restoring Voting Views...")
+
+        # Get all active proposals from MongoDB
+        proposals = await self.db.find({"status": ProposalStatus.ACTIVE.value}).to_list()
+
+        if not proposals:
+            logger.debug("⌛ [PROPOSALS] [1] No Voting Views To Restore")
+            return
+
+        restored = 0
+
+        for proposal_data in proposals:
+            try:
+                # Try to fetch the thread and message
+                thread: discord.Thread = await self.bot.fetch_channel(proposal_data["thread_id"])
+                if not thread:
+                    continue
+
+                message: discord.Message = await thread.fetch_message(proposal_data["message_id"])
+                if not message:
+                    continue
+
+                # Create and add the view to the message
+                view = VotingView(self, thread.id)
+                self.bot.add_view(view, message_id=message.id)
+
+                restored += 1
+            except (discord.NotFound, discord.Forbidden):
+                logger.warning(f"⌛ [PROPOSALS] [1] Proposal Not Found: {proposal_data['thread_id']}")
+            except Exception:
+                logger.exception(f"⌛ [PROPOSALS] [1] Error Restoring View For Proposal: {proposal_data['thread_id']}")
+
+        logger.debug(f"⌛ [PROPOSALS] [1] Restored {restored} Voting Views")
+
+    @restore_voting_views.before_loop
+    async def before_restore_voting_views(self) -> None:
+        """Wait until the bot is ready before restoring voting views."""
+
+        await self.bot.wait_until_ready()
+
+    @restore_voting_views.error
+    async def restore_voting_views_error(self, error: Exception) -> None:
+        """
+        Handle errors in the restore_voting_views loop.
+
+        Args:
+            error (Exception): The raised exception
+        """
+
+        logger.error("⌛ [PROPOSALS] [1] Error Restoring Voting Views", exc_info=error)
 
     @discord.slash_command(description="Submit a proposal")
     async def propose(self, ctx: discord.ApplicationContext) -> None:
