@@ -51,7 +51,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
 
         # Start cog tasks
-        self.process_hangar_embeds.start()
+        # self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
@@ -274,7 +274,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
         except Exception:
             logger.exception("[HANGAR] Error Creating Hangar Embed")
-            await ctx.followup.send(embed=ErrorEmbed(description="Failed to create hangar timer. Please try again."), ephemeral=True)
+            await ctx.followup.send(embed=ErrorEmbed(description="Failed to create the hangar embed. Please try again."), ephemeral=True)
 
     @hangar.command(description="Manually refresh the cycle data")
     async def update(self, ctx: discord.ApplicationContext) -> None:
@@ -293,7 +293,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             embed_count = len(embed_ids)
 
             if embed_count == 0:
-                await ctx.followup.send(embed=ErrorEmbed(description="No hangar timers are currently being tracked."), ephemeral=True)
+                await ctx.followup.send(embed=ErrorEmbed(None, "No hangar timers are currently being tracked."), ephemeral=True)
                 return
 
             # Manually trigger the update task

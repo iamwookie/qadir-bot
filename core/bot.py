@@ -7,8 +7,7 @@ from pymongo import AsyncMongoClient
 from upstash_redis.asyncio import Redis
 
 from config import MONGODB_URI, PYTHON_ENV, config
-
-from .embeds import ErrorEmbed
+from utils.embeds import ErrorEmbed
 
 logger = logging.getLogger("qadir")
 
@@ -52,10 +51,13 @@ class Qadir(discord.Bot):
 
         try:
             if isinstance(exception, CheckFailure):
-                embed = ErrorEmbed(description="You do not have permission to use this command")
+                embed = ErrorEmbed("Permission Denied", "You do not have permission to use this command")
                 await ctx.respond(embed=embed, ephemeral=True)
             elif isinstance(exception, CommandOnCooldown):
-                embed = ErrorEmbed(description=f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds")
+                embed = ErrorEmbed(
+                    "Command On Cooldown",
+                    f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds",
+                )
                 await ctx.respond(embed=embed, ephemeral=True)
             else:
                 logger.error("[COG] Application Command Error", exc_info=exception)

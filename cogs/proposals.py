@@ -191,7 +191,6 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         """
 
         modal = CreateProposalModal(self, title="Create a Proposal")
-
         await ctx.send_modal(modal)
 
 

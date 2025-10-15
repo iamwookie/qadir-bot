@@ -166,7 +166,7 @@ class UtilityCog(Cog, name="Utility"):
         await ctx.defer(ephemeral=True)
 
         user_id_str = user_id.strip() if user_id else str(ctx.author.id)
-        not_found_embed = ErrorEmbed(description="User not found")
+        not_found_embed = ErrorEmbed("Not Found", "The user was not found.")
 
         try:
             user = await self.bot.get_or_fetch_user(int(user_id_str))
@@ -174,7 +174,9 @@ class UtilityCog(Cog, name="Utility"):
             await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
         except ValueError:
-            await ctx.followup.send(embed=ErrorEmbed(description="Invalid user ID provided"), ephemeral=True)
+            await ctx.followup.send(
+                embed=ErrorEmbed("Invalid User ID", "Invalid user ID provided, e.g. 123456789012345678"), ephemeral=True
+            )
             return
 
         if not user:
