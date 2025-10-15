@@ -63,12 +63,8 @@ class VotingView(discord.ui.View):
         """Update the embed in the message to reflect current vote counts."""
 
         embeds = message.embeds
-        if not embeds or len(embeds) < 2:
-            return
-
-        embeds[1].set_field_at(0, name="👍 Upvotes", value=f"`{len(self.votes['upvotes'])}`", inline=True)
-        embeds[1].set_field_at(1, name="👎 Downvotes", value=f"`{len(self.votes['downvotes'])}`", inline=True)
-
+        embeds[0].set_field_at(0, name="👍 Upvotes", value=f"`{len(self.votes['upvotes'])}`", inline=True)
+        embeds[0].set_field_at(1, name="👎 Downvotes", value=f"`{len(self.votes['downvotes'])}`", inline=True)
         await message.edit(embeds=embeds)
 
     @discord.ui.button(label="👍", style=discord.ButtonStyle.green, custom_id="upvote")
