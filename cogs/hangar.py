@@ -51,7 +51,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
 
         # Start cog tasks
-        # self.process_hangar_embeds.start()
+        self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
