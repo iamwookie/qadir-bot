@@ -51,7 +51,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
 
         # Start cog tasks
-        # self.process_hangar_embeds.start()
+        self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
@@ -225,9 +225,9 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
     @process_hangar_embeds.before_loop
     async def before_process_hangar_embeds(self):
-        """Wait for bot to be ready before processing hangar embeds."""
+        """Wait for bot to be initialised before processing hangar embeds."""
 
-        await self.bot.wait_until_ready()
+        await self.bot.wait_until_initialised()
 
     @process_hangar_embeds.error
     async def process_hangar_embeds_error(self, error: Exception):

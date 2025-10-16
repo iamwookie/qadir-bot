@@ -1,12 +1,12 @@
 from enum import Enum
 
 
-class EventStatus(Enum):
+class EventStatus(str, Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
     ARCHIVED = "archived"
 
 
-class ProposalStatus(Enum):
+class ProposalStatus(str, Enum):
     ACTIVE = "active"
     CLOSED = "closed"

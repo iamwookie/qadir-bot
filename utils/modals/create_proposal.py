@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from config import config
+from models.proposals import Proposal
 
 from ..embeds import ErrorEmbed, SuccessEmbed
 from ..enums import ProposalStatus
@@ -25,7 +26,6 @@ class CreateProposalModal(discord.ui.Modal):
         super().__init__(*args, **kwargs)
 
         self.cog = cog
-        self.db = cog.db
 
         self.add_item(discord.ui.InputText(label="Title", max_length=64, style=discord.InputTextStyle.short, required=True))
         self.add_item(discord.ui.InputText(label="Summary", max_length=2048, style=discord.InputTextStyle.long, required=True))
@@ -44,8 +44,8 @@ class CreateProposalModal(discord.ui.Modal):
         await interaction.response.defer(ephemeral=True)
 
         channel: discord.TextChannel = await interaction.client.fetch_channel(CHANNEL_ID)
-        length = await self.db.count_documents({})
-        title = f"Proposal #{length + 1} - {self.children[0].value}"
+        count = await Proposal.count()
+        title = f"Proposal #{count + 1} - {self.children[0].value}"
         thread = await channel.create_thread(name=title, type=discord.ChannelType.public_thread)
 
         summary_embed = discord.Embed(title=title, description=self.children[1].value)
@@ -65,16 +65,13 @@ class CreateProposalModal(discord.ui.Modal):
             thread.send(embed=poll_embed, view=VotingView(self.cog, thread_id=thread.id)),
         )
 
-        await self.db.insert_one(
-            {
-                "thread_id": str(thread.id),
-                "message_id": str(result[-1].id),
-                "creator_id": str(interaction.user.id),
-                "created_at": discord.utils.utcnow(),
-                "status": ProposalStatus.ACTIVE.value,
-                "votes": {"upvotes": [], "downvotes": []},
-            }
-        )
+        await Proposal(
+            thread_id=str(thread.id),
+            message_id=str(result[-1].id),
+            creator_id=str(interaction.user.id),
+            created_at=discord.utils.utcnow(),
+            status=ProposalStatus.ACTIVE,
+        ).insert()
 
         embed = SuccessEmbed(title="Proposal Created", description=f"Your proposal has been created in {thread.mention}.")
         await interaction.followup.send(embed=embed, ephemeral=True)

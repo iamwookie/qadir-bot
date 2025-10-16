@@ -1,6 +1,6 @@
-import discord
-
 from typing import TYPE_CHECKING
+
+import discord
 
 if TYPE_CHECKING:
     from cogs.events import EventsCog
@@ -38,7 +38,7 @@ class EventSelect(discord.ui.Select):
     """Dropdown for event selection."""
 
     def __init__(self, cog: "EventsCog", options: list):
-        super().__init__(placeholder=f"Choose an event to join...", options=options, min_values=1, max_values=1)
+        super().__init__(placeholder="Choose an event to join...", options=options, min_values=1, max_values=1)
 
         self.cog = cog
         self.redis = cog.redis

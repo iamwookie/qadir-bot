@@ -1,9 +1,12 @@
+import asyncio
 import logging
 
 import discord
+from beanie import init_beanie
 from discord.errors import CheckFailure
 from discord.ext.commands import CommandOnCooldown
 from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
 from upstash_redis.asyncio import Redis
 
 from config import MONGODB_URI, PYTHON_ENV, config
@@ -21,24 +24,32 @@ class Qadir(discord.Bot):
 
         logger.info(f"⏳ {name} (v{version}) Initializing...")
 
+        # Event to track if the bot is fully initialised
+        self._initialised: asyncio.Event = asyncio.Event()
+
         # Redis - Caching and Session Store
-        self.redis = Redis.from_env()
+        self.redis: Redis = Redis.from_env()
 
         # MongoDB - Database
-        self.mongo = AsyncMongoClient(MONGODB_URI)
-        self.db = self.mongo["qadir-main" if PYTHON_ENV == "production" else "qadir-dev"]
+        self.mongo: AsyncMongoClient = AsyncMongoClient(MONGODB_URI)
+        self.db: AsyncDatabase = self.mongo["qadir-main" if PYTHON_ENV == "production" else "qadir-dev"]
 
         super().__init__(*args, **options)
 
     async def on_ready(self) -> None:
         """Called when the bot is ready."""
 
+        await init_beanie(database=self.db, document_models=["models.proposals.Proposal"])
+
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")
 
         await self.change_presence(activity=discord.CustomActivity(name=f"🌐 v{config['app']['version']} • /help"))
 
-        logger.info(f"✅ Logged in: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
+        if not self._initialised.is_set():
+            self._initialised.set()
+
+        logger.info(f"✅ Initialised: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
 
     async def on_application_command_error(self, ctx: discord.ApplicationContext, exception: Exception) -> None:
         """
@@ -63,3 +74,8 @@ class Qadir(discord.Bot):
                 logger.error("[COG] Application Command Error", exc_info=exception)
         except Exception:
             logger.exception("[BOT] Application Command Handler Error")
+
+    async def wait_until_initialised(self) -> None:
+        """Wait until the bot is fully initialised."""
+
+        await self._initialised.wait()
