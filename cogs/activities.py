@@ -127,9 +127,8 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
             after: discord.Member: The member after the update
         """
 
-        # Make sure the bot is ready
-        # NOTE: Temporary until I figure out if this event fires after on_ready
-        await self.bot.wait_until_ready()
+        # Make sure the bot is initialised
+        await self.bot.wait_until_initialised()
 
         # Check if this guild is in our monitored guilds
         if after.guild.id not in GUILD_IDS:

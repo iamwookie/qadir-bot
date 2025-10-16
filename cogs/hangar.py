@@ -225,9 +225,9 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
     @process_hangar_embeds.before_loop
     async def before_process_hangar_embeds(self):
-        """Wait for bot to be ready before processing hangar embeds."""
+        """Wait for bot to be initialised before processing hangar embeds."""
 
-        await self.bot.wait_until_ready()
+        await self.bot.wait_until_initialised()
 
     @process_hangar_embeds.error
     async def process_hangar_embeds_error(self, error: Exception):
@@ -274,7 +274,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
         except Exception:
             logger.exception("[HANGAR] Error Creating Hangar Embed")
-            await ctx.followup.send(embed=ErrorEmbed(description="Failed to create hangar timer. Please try again."), ephemeral=True)
+            await ctx.followup.send(embed=ErrorEmbed(description="Failed to create the hangar embed. Please try again."), ephemeral=True)
 
     @hangar.command(description="Manually refresh the cycle data")
     async def update(self, ctx: discord.ApplicationContext) -> None:
@@ -293,7 +293,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             embed_count = len(embed_ids)
 
             if embed_count == 0:
-                await ctx.followup.send(embed=ErrorEmbed(description="No hangar timers are currently being tracked."), ephemeral=True)
+                await ctx.followup.send(embed=ErrorEmbed(None, "No hangar timers are currently being tracked."), ephemeral=True)
                 return
 
             # Manually trigger the update task

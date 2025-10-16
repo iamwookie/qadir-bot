@@ -2,25 +2,7 @@ from datetime import datetime
 
 import discord
 
-from .common import dt_to_psx
-
-
-class SuccessEmbed(discord.Embed):
-    """
-    A custom embed class for displaying success messages.
-    """
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(colour=discord.Colour.green(), **kwargs)
-
-
-class ErrorEmbed(discord.Embed):
-    """
-    A custom embed class for displaying error messages.
-    """
-
-    def __init__(self, description: str = "Uh Oh. Something went wrong. 😞", **kwargs) -> None:
-        super().__init__(description=description, colour=discord.Colour.red(), **kwargs)
+from ..common import dt_to_psx
 
 
 class HangarEmbed(discord.Embed):
