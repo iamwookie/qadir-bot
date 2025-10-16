@@ -22,15 +22,9 @@ if __name__ == "__main__":
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
 
-    # Enable default intents and add privileged intents
-    intents = Intents.default()
-    intents.members = True  # Privileged intent
-    intents.presences = True  # Privileged intent
-
-    bot = Qadir(intents=intents)
+    bot = Qadir(intents=Intents.default())
 
     bot.load_extension("cogs.utility")
-    # bot.load_extension("cogs.activities")
     bot.load_extension("cogs.proposals")
     bot.load_extension("cogs.events")
     bot.load_extension("cogs.hangar")

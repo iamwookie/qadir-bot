@@ -1,17 +1,16 @@
+import json
 import logging
+from datetime import datetime, timezone
 
 import discord
-from discord.ext import tasks
+from discord.ext import commands, tasks
 
 from config import config
 from core import Cog, Qadir
-from models.proposals import Proposal
-from utils.enums import ProposalStatus
-from utils.modals import CreateProposalModal
-from utils.views import VotingView
+from modals import CreateProposalModal
 
-GUILD_IDS = config["proposals"]["guilds"]
-ROLE_IDS = config["proposals"]["roles"]
+GUILD_IDS: list[int] = config["proposals"]["guilds"]
+ROLE_IDS: list[int] = config["proposals"]["roles"]
 
 logger = logging.getLogger("qadir")
 
@@ -32,15 +31,12 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
-        # Start cog tasks
         self.process_proposals.start()
-        self.restore_voting_views.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
 
         self.process_proposals.cancel()
-        self.restore_voting_views.cancel()
 
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
         """
@@ -62,132 +58,194 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         Posts results and locks threads.
         """
 
-        logger.debug("⌛ [PROPOSALS] [0] Processing Proposals...")
+        logger.info("⌛ [PROPOSALS] Processing Proposals...")
 
-        proposals = await Proposal.find(Proposal.status == ProposalStatus.ACTIVE).to_list()
+        proposals = await self.bot.redis.smembers("qadir:proposals")
+        proposals = [json.loads(p) for p in proposals]
 
         if not proposals:
-            logger.debug("⌛ [PROPOSALS] [0] No Proposals To Process")
+            logger.info("⌛ [PROPOSALS] No Proposals To Process")
             return
 
         processed = 0
 
-        for proposal in proposals:
+        for data in proposals:
             try:
-                thread: discord.Thread = await self.bot.fetch_channel(int(proposal.thread_id))
-                message: discord.Message = await thread.fetch_message(int(proposal.message_id))
+                thread: discord.Thread = await self.bot.fetch_channel(data["thread_id"])
+                message: discord.Message = await thread.fetch_message(data["message_id"])
 
-                if (discord.utils.utcnow() - message.created_at).total_seconds() < 86400:
+                await self.cleanup_conflicting_votes(message)
+
+                if (datetime.now(timezone.utc) - message.created_at).total_seconds() < 86400:
                     continue
 
-                upvotes = len(proposal.votes.upvotes)
-                downvotes = len(proposal.votes.downvotes)
+                upvotes: int = sum(r.count for r in message.reactions if r.emoji == "👍") - 1
+                downvotes: int = sum(r.count for r in message.reactions if r.emoji == "👎") - 1
 
                 embed = discord.Embed(title="Proposal Closed", description="Voting has ended for this proposal.", colour=0xFF0000)
-                embed.add_field(name="👍 Upvotes", value=f"`{upvotes}`", inline=True)
-                embed.add_field(name="👎 Downvotes", value=f"`{downvotes}`", inline=True)
+                embed.add_field(name="Upvotes", value=f"`{upvotes}`", inline=True)
+                embed.add_field(name="Downvotes", value=f"`{downvotes}`", inline=True)
 
-                await message.edit(view=None)
                 await thread.send(embed=embed)
                 await thread.edit(locked=True)
 
-                proposal.status = ProposalStatus.CLOSED
-
-                await proposal.replace()
+                await self.bot.redis.srem("qadir:proposals", json.dumps(data))
 
                 processed += 1
-            except (discord.NotFound, discord.Forbidden):
-                # Thread or message no longer exists, clean up MongoDB
-                await proposal.delete()
-                logger.warning(f"⌛ [PROPOSALS] [0] Cleaned Up Non-Existent Proposal: {proposal.thread_id}")
+            except discord.NotFound:
+                logger.warning(f"[TASK] Proposal {data['thread_id']} Not Found")
+                await self.bot.redis.srem("qadir:proposals", json.dumps(data))
             except Exception:
-                logger.exception(f"⌛ [PROPOSALS] [0] Error Processing Proposal: {proposal.thread_id}")
+                logger.exception(f"[TASK] Error Processing Proposal {data['thread_id']}")
 
-        logger.debug(f"⌛ [PROPOSALS] [0] Processed {processed} Proposals")
+        logger.info(f"⌛ [PROPOSALS] Processed {processed} Proposals")
 
     @process_proposals.before_loop
     async def before_process_proposals(self) -> None:
-        """Wait until the bot is initialised before processing proposals."""
+        """
+        Wait until the bot is ready before running the proposal loop.
+        """
 
-        await self.bot.wait_until_initialised()
+        await self.bot.wait_until_ready()
 
     @process_proposals.error
     async def process_proposals_error(self, error: Exception) -> None:
         """
-        Handle errors in the process_proposals loop.
+        Handle errors in the proposal loop.
 
         Args:
             error (Exception): The raised exception
         """
 
-        logger.error("⌛ [PROPOSALS] Error Processing Proposals", exc_info=error)
+        logger.error("[TASK] Proposals Processing Error", exc_info=error)
 
-    @tasks.loop(count=1)
-    async def restore_voting_views(self) -> None:
-        """Restore voting views from MongoDB on bot startup."""
-
-        logger.debug("⌛ [PROPOSALS] [1] Restoring Voting Views...")
-
-        # Get all active proposals from MongoDB
-        proposals = await Proposal.find(Proposal.status == ProposalStatus.ACTIVE).to_list()
-
-        if not proposals:
-            logger.debug("⌛ [PROPOSALS] [1] No Voting Views To Restore")
-            return
-
-        restored = 0
-
-        for proposal in proposals:
-            try:
-                # Try to fetch the thread and message
-                thread = await self.bot.fetch_channel(int(proposal.thread_id))
-                if not isinstance(thread, discord.Thread):
-                    continue
-
-                message = await thread.fetch_message(int(proposal.message_id))
-                if not isinstance(message, discord.Message):
-                    continue
-
-                # Create and add the view to the message
-                view = VotingView(self, thread.id)
-                self.bot.add_view(view, message_id=message.id)
-
-                restored += 1
-            except (discord.NotFound, discord.Forbidden):
-                logger.warning(f"⌛ [PROPOSALS] [1] Proposal Not Found: {proposal.thread_id}")
-            except Exception:
-                logger.exception(f"⌛ [PROPOSALS] [1] Error Restoring View For Proposal: {proposal.thread_id}")
-
-        logger.debug(f"⌛ [PROPOSALS] [1] Restored {restored} Voting Views")
-
-    @restore_voting_views.before_loop
-    async def before_restore_voting_views(self) -> None:
-        """Wait until the bot is initialised before restoring voting views."""
-
-        await self.bot.wait_until_initialised()
-
-    @restore_voting_views.error
-    async def restore_voting_views_error(self, error: Exception) -> None:
-        """
-        Handle errors in the restore_voting_views loop.
-
-        Args:
-            error (Exception): The raised exception
-        """
-
-        logger.error("⌛ [PROPOSALS] [1] Error Restoring Voting Views", exc_info=error)
-
-    @discord.slash_command(description="Submit a proposal")
+    @discord.slash_command()
     async def propose(self, ctx: discord.ApplicationContext) -> None:
         """
-        Send a CreateProposalModal to submit a proposal.
+        Submit a proposal.
 
         Args:
             ctx (discord.ApplicationContext): The application context
         """
 
-        modal = CreateProposalModal(self, title="Create a Proposal")
+        modal = CreateProposalModal(title="Create a Proposal")
+
         await ctx.send_modal(modal)
+
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User | discord.Member) -> None:
+        """
+        Fast, live handler for new reactions on cached messages.
+
+        Args:
+            reaction (discord.Reaction): The added reaction
+            user (discord.User | discord.Member): The reacting user
+        """
+        if user.bot:
+            return
+
+        await self.handle_vote_conflict(reaction.message, user, str(reaction.emoji))
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
+        """
+        Reliable fallback handler for all reactions, even on uncached messages.
+
+        Args:
+            payload (discord.RawReactionActionEvent): The raw reaction event
+        """
+
+        if payload.user_id == self.bot.user.id:
+            return
+
+        try:
+            channel: discord.abc.Messageable = await self.bot.fetch_channel(payload.channel_id)
+            message: discord.Message = await channel.fetch_message(payload.message_id)
+            user: discord.User = await self.bot.fetch_user(payload.user_id)
+
+            await self.handle_vote_conflict(message, user, str(payload.emoji))
+        except Exception:
+            logger.exception("[RAW] Failed To Process Raw Reaction Event")
+
+    async def handle_vote_conflict(self, message: discord.Message, user: discord.User, new_emoji: str) -> None:
+        """
+        Remove conflicting vote emoji if user has already voted oppositely.
+
+        Args:
+            message (discord.Message): The message the user reacted to
+            user (discord.User): The user who reacted
+            new_emoji (str): The emoji they just added
+        """
+
+        vote_emojis: dict[str, str] = {"👍": "👎", "👎": "👍"}
+        conflicting_emoji: str | None = vote_emojis.get(new_emoji)
+
+        if conflicting_emoji is None:
+            return
+
+        tracked = await self.bot.redis.smembers("qadir:proposals")
+        tracked_ids = {int(json.loads(p)["message_id"]) for p in tracked}
+
+        if message.id not in tracked_ids:
+            return
+
+        for r in message.reactions:
+            if str(r.emoji) == conflicting_emoji:
+                users = await r.users().flatten()
+
+                if any(u.id == user.id for u in users):
+                    await r.remove(user)
+                    logger.info(f"[VOTES] Removed conflicting vote '{conflicting_emoji}' from {user.name} on {message.id}.")
+
+    async def cleanup_conflicting_votes(self, message: discord.Message) -> None:
+        """
+        Remove older conflicting votes from users who reacted with both 👍 and 👎.
+
+        Keeps only the last emoji in message.reactions order (assumed latest).
+
+        Args:
+            message (discord.Message): The message to clean up votes on.
+        """
+
+        try:
+            user_votes: dict[int, list[str]] = {}
+            emoji_order: list[str] = []
+
+            for reaction in message.reactions:
+                if reaction.emoji not in {"👍", "👎"}:
+                    continue
+
+                emoji_order.append(reaction.emoji)
+                users = await reaction.users().flatten()
+
+                for u in users:
+                    if u.bot:
+                        continue
+
+                    user_votes.setdefault(u.id, []).append(reaction.emoji)
+
+            for user_id, votes in user_votes.items():
+                if len(set(votes)) <= 1:
+                    continue
+
+                # Keep the last seen emoji from the defined order
+                emojis = set(votes)
+
+                for emoji in reversed(emoji_order):
+                    if emoji in emojis:
+                        keep_emoji = emoji
+                        break
+
+                for reaction in message.reactions:
+                    if reaction.emoji in {"👍", "👎"} and reaction.emoji != keep_emoji:
+                        users = await reaction.users().flatten()
+
+                        for u in users:
+                            if u.id == user_id:
+                                await reaction.remove(u)
+                                logger.info(f"[CLEANUP] Removed older vote '{reaction.emoji}' from user {u.name} on message {message.id}.")
+        except Exception:
+            logger.exception("[VOTING] Error Cleaning Up Conflicting Votes")
 
 
 def setup(bot: Qadir) -> None:

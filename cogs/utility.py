@@ -5,8 +5,7 @@ from discord.ext import commands
 
 from config import config
 from core import Cog, Qadir
-from utils import dt_to_psx
-from utils.embeds import ErrorEmbed
+from core.embeds import ErrorEmbed
 
 logger = logging.getLogger("qadir")
 
@@ -34,7 +33,7 @@ class UtilityCog(Cog, name="Utility"):
             ctx (discord.ApplicationContext): The application context
         """
 
-        dev_id = 244662779745665026
+        dev_id: int = 244662779745665026
 
         embed = discord.Embed(title="App Information", description=f"A magical application created by <@{dev_id}>", colour=0x00FF00)
         embed.add_field(name="Version", value=f"`{config['app']['version']}`")
@@ -63,85 +62,70 @@ class UtilityCog(Cog, name="Utility"):
         hangar_commands: list[tuple[str, str]] = []
         other_commands: list[tuple[str, str]] = []
 
-        # Iterate through cogs mapping (qualified_name -> cog)
-        for cog_name, cog in self.bot.cogs.items():
-            cog_name_lower = cog_name.lower()
+        # Dynamically fetch all application commands using walk_application_commands
+        for command in self.bot.walk_application_commands():
+            # Check if command is available in current guild
+            command_is_available = True
 
-            # Get all commands from this cog
-            for command in cog.get_commands():
-                if isinstance(command, discord.SlashCommand):
-                    # Handle individual SlashCommands
-                    command_is_available = True
+            if isinstance(command, discord.SlashCommand):
+                # For subcommands, check parent group's guild_ids if the command itself doesn't have them
+                if hasattr(command, "guild_ids") and command.guild_ids:
+                    command_is_available = ctx.guild and ctx.guild.id in command.guild_ids
 
-                    # Check guild restrictions
-                    if hasattr(command, "guild_ids") and command.guild_ids:
-                        command_is_available = ctx.guild and ctx.guild.id in command.guild_ids
+                # If the command doesn't have guild_ids but its parent does, use parent's guild_ids
+                # NOTE: We use isinstance here due to type checking not picking up correct type for 'parent'
+                if (
+                    isinstance(command.parent, discord.SlashCommandGroup)
+                    and hasattr(command.parent, "guild_ids")
+                    and command.parent.guild_ids
+                ):
+                    command_is_available = ctx.guild and ctx.guild.id in command.parent.guild_ids
 
-                    if command_is_available:
-                        command_name = f"/{command.qualified_name}"
-                        command_desc = command.description or "No description provided"
+                if command_is_available:
+                    command_name: str = f"/{command.qualified_name}"
+                    command_desc: str = command.description or "No description provided"
 
-                        # Categorize commands based on cog name
-                        if cog_name_lower == "utility":
+                    # Categorize commands based on their cog's qualified_name
+                    if isinstance(command.cog, discord.Cog):
+                        cog_name: str = command.cog.qualified_name.lower()
+
+                        if cog_name == "utility":
                             utility_commands.append((command_name, command_desc))
-                        elif cog_name_lower == "proposals":
+                        elif cog_name == "proposals":
                             proposal_commands.append((command_name, command_desc))
-                        elif cog_name_lower == "events":
+                        elif cog_name == "events":
                             event_commands.append((command_name, command_desc))
-                        elif cog_name_lower == "hangar":
+                        elif cog_name == "hangar":
                             hangar_commands.append((command_name, command_desc))
                         else:
                             other_commands.append((command_name, command_desc))
-                elif isinstance(command, discord.SlashCommandGroup):
-                    # Handle SlashCommandGroup and its subcommands
-                    group_available = True
+                    else:
+                        other_commands.append((command_name, command_desc))
 
-                    # Check guild restrictions for the group
-                    if hasattr(command, "guild_ids") and command.guild_ids:
-                        group_available = ctx.guild and ctx.guild.id in command.guild_ids
-
-                    if group_available:
-                        # Add subcommands
-                        for subcommand in command.subcommands:
-                            if isinstance(subcommand, discord.SlashCommand):
-                                subcommand_name = f"/{subcommand.qualified_name}"
-                                subcommand_desc = subcommand.description or "No description provided"
-
-                                # Categorize subcommands based on cog name
-                                if cog_name_lower == "utility":
-                                    utility_commands.append((subcommand_name, subcommand_desc))
-                                elif cog_name_lower == "proposals":
-                                    proposal_commands.append((subcommand_name, subcommand_desc))
-                                elif cog_name_lower == "events":
-                                    event_commands.append((subcommand_name, subcommand_desc))
-                                elif cog_name_lower == "hangar":
-                                    hangar_commands.append((subcommand_name, subcommand_desc))
-                                else:
-                                    other_commands.append((subcommand_name, subcommand_desc))
-
+        # Add commands to embed in organized sections
         if utility_commands:
             for name, desc in utility_commands:
-                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if proposal_commands:
             embed.add_field(name="📋 **Proposal Commands**", value="", inline=False)
             for name, desc in proposal_commands:
-                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if event_commands:
             embed.add_field(name="🏆 **Event Commands**", value="", inline=False)
             for name, desc in event_commands:
-                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if hangar_commands:
             embed.add_field(name="🚀 **Hangar Commands**", value="", inline=False)
             for name, desc in hangar_commands:
-                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         if other_commands:
-            embed.add_field(name="🔧 **Other Commands**", value="", inline=False)
+            embed.add_field(name="⚙️ **Other Commands**", value="", inline=False)
             for name, desc in other_commands:
-                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
+                embed.add_field(name=f"`{name}`", value=desc, inline=False)
 
         # Add footer with guild info
         if ctx.guild:
@@ -155,8 +139,7 @@ class UtilityCog(Cog, name="Utility"):
     @discord.option("user_id", str, description="A user to find by ID")
     @commands.cooldown(1, 15.0, commands.BucketType.user)
     async def find(self, ctx: discord.ApplicationContext, user_id: str | None = None) -> None:
-        """
-        Get information about a user.
+        """Get information about a user.
 
         Args:
             ctx (discord.ApplicationContext): The application context
@@ -165,36 +148,29 @@ class UtilityCog(Cog, name="Utility"):
 
         await ctx.defer(ephemeral=True)
 
-        user_id_str = user_id.strip() if user_id else str(ctx.author.id)
-        not_found_embed = ErrorEmbed("Not Found", "The user was not found.")
+        user_id_str: str = user_id.strip() if user_id else str(ctx.author.id)
 
         try:
-            user = await self.bot.get_or_fetch_user(int(user_id_str))
+            user: discord.User = await self.bot.get_or_fetch_user(int(user_id_str))
         except discord.NotFound:
-            await ctx.followup.send(embed=not_found_embed, ephemeral=True)
+            await ctx.respond(embed=ErrorEmbed(description="User not found"), ephemeral=True)
             return
         except ValueError:
-            await ctx.followup.send(
-                embed=ErrorEmbed("Invalid User ID", "Invalid user ID provided, e.g. 123456789012345678"), ephemeral=True
-            )
+            await ctx.respond(embed=ErrorEmbed(description="Invalid user ID provided"), ephemeral=True)
             return
 
-        if not user:
-            await ctx.followup.send(embed=not_found_embed, ephemeral=True)
-            return
-
-        embed = discord.Embed(title="User Information", colour=0xFFFFFF)
+        embed: discord.Embed = discord.Embed(title="User Information", colour=0xFFFFFF)
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="Name", value=f"`{str(user)}`", inline=False)
         embed.add_field(name="User ID", value=f"`{user.id}`", inline=False)
-        embed.add_field(name="Account Created", value=f"<t:{dt_to_psx(user.created_at)}:R>", inline=False)
+        embed.add_field(name="Account Created", value=f"<t:{int(user.created_at.timestamp())}:R>", inline=False)
 
         if isinstance(ctx.guild, discord.Guild):
             try:
-                member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
+                member: discord.Member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
 
-                if member.joined_at:
-                    embed.add_field(name="Server Joined", value=f"<t:{dt_to_psx(member.joined_at)}:R>", inline=False)
+                if member and member.joined_at:
+                    embed.add_field(name="Server Joined", value=f"<t:{int(member.joined_at.timestamp())}:R>", inline=False)
 
                 if member.roles:
                     roles: list[str] = [role.mention for role in member.roles if role.id != ctx.guild.id]
@@ -210,9 +186,9 @@ class UtilityCog(Cog, name="Utility"):
             embed.set_image(url=user.banner.url)
 
         if user.bot:
-            embed.set_footer(text="⚠️ This user is a bot")
+            embed.set_footer(text="⚠️ This user is a bot.")
 
-        await ctx.followup.send(embed=embed, ephemeral=True)
+        await ctx.respond(embed=embed, ephemeral=True)
 
 
 def setup(bot: Qadir) -> None:

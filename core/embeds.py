@@ -1,8 +1,24 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import discord
 
-from ..common import dt_to_psx
+
+class SuccessEmbed(discord.Embed):
+    """
+    A custom embed class for displaying success messages.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(colour=discord.Colour.green(), **kwargs)
+
+
+class ErrorEmbed(discord.Embed):
+    """
+    A custom embed class for displaying error messages.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(colour=discord.Colour.red(), **kwargs)
 
 
 class HangarEmbed(discord.Embed):
@@ -18,7 +34,7 @@ class HangarEmbed(discord.Embed):
             state (dict): The current hangar state information
         """
 
-        super().__init__(title="Executive Hangar Status", color=state["color"], timestamp=discord.utils.utcnow(), **kwargs)
+        super().__init__(title="Star Citizen Executive Hangar Status", color=state["color"], timestamp=datetime.now(timezone.utc), **kwargs)
 
         # Author field
         self.set_author(name="Provided by: exec.xyxyll.com", url="https://exec.xyxyll.com")
@@ -26,13 +42,8 @@ class HangarEmbed(discord.Embed):
         # Status field
         self.add_field(name="🎯 Current Status", value=f"**{state['status']}**", inline=True)
 
-        # Discord timestamp field - shows exact time in user's timezone
-        next_status_change: datetime = state["next_status_change"]
-        self.add_field(name="⏰ Next Status Change", value=f"<t:{dt_to_psx(next_status_change)}:R>", inline=True)
-
-        # Discord timestamp field - shows exact time in user's timezone
-        next_light_change: datetime = state["next_light_change"]
-        self.add_field(name="⏰ Next Light Change", value=f"<t:{dt_to_psx(next_light_change)}:R>", inline=True)
+        # Timer field - make it clear this is time until next change
+        self.add_field(name="⏰ Time Until Next Change", value=f"`{state['time_left']}`", inline=True)
 
         # LED lights status (visual indicator)
         lights_display = " ".join(state["lights"])
@@ -52,4 +63,4 @@ class HangarEmbed(discord.Embed):
                 inline=False,
             )
 
-        self.set_footer(text="Updated for Star Citizen Patch 4.3.1-LIVE (Ver 10321721)")
+        self.set_footer(text="Updated for Star Citizen Patch 4.3.1-LIVE (Ver 10275505)")
