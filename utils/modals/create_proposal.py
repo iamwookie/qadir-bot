@@ -56,7 +56,7 @@ class CreateProposalModal(discord.ui.Modal):
         poll_embed = discord.Embed(description="Please use the buttons below to cast your vote.")
         poll_embed.add_field(name="👍 Upvotes", value="`0`", inline=True)
         poll_embed.add_field(name="👎 Downvotes", value="`0`", inline=True)
-        poll_embed.set_footer(text="Voting will close in 24 hours.")
+        poll_embed.set_footer(text="Voting will close in 24 hours")
 
         result = await asyncio.gather(
             thread.send(embed=summary_embed),

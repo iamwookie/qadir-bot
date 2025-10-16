@@ -210,7 +210,7 @@ class UtilityCog(Cog, name="Utility"):
             embed.set_image(url=user.banner.url)
 
         if user.bot:
-            embed.set_footer(text="⚠️ This user is a bot.")
+            embed.set_footer(text="⚠️ This user is a bot")
 
         await ctx.followup.send(embed=embed, ephemeral=True)
 

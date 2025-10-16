@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import discord
 
+from models.events import Event
+
 from ..embeds import ErrorEmbed, EventEmbed, SuccessEmbed
 from ..enums import EventStatus
 
@@ -19,9 +21,8 @@ class CreateEventModal(discord.ui.Modal):
     def __init__(self, cog: "EventsCog", *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.cog = cog
+        self.cog: "EventsCog" = cog
         self.redis = cog.redis
-        self.db = cog.db
 
         self.add_item(discord.ui.InputText(label="Event Name", style=discord.InputTextStyle.short, required=True))
         self.add_item(discord.ui.InputText(label="Description", style=discord.InputTextStyle.long, required=False))
@@ -51,8 +52,8 @@ class CreateEventModal(discord.ui.Modal):
         # Create event embed
         event_embed = EventEmbed(
             name=event_name,
-            description=description,
-            status=EventStatus.ACTIVE.value,
+            desc=description,
+            status=EventStatus.ACTIVE,
             participants=[str(interaction.user.id)],
             loot_entries=[],
         )
@@ -60,37 +61,36 @@ class CreateEventModal(discord.ui.Modal):
 
         # Instructions embed
         instructions_embed = discord.Embed(
-            title="Participate",
+            title="Participation",
             description=(
                 "• Check the event card above for current totals and distribution\n"
                 "• Use `/event join` to join this event\n"
                 "• Use `/event loot` to add items you've collected\n"
                 "• Event creator can use `/event finalize` to finalise the event"
             ),
-            colour=0x0099FF,
         )
 
         message = await thread.send(embeds=[event_embed, instructions_embed])
 
-        event_data = {
-            "thread_id": str(thread.id),
-            "message_id": str(message.id),
-            "name": event_name,
-            "description": description,
-            "creator_id": str(interaction.user.id),
-            "status": EventStatus.ACTIVE.value,
-            "created_at": discord.utils.utcnow(),
-            "participants": [str(interaction.user.id)],  # Creator is automatically a participant
-            "loot_entries": [],
-        }
-
-        await self.db.insert_one(event_data)
+        # Add event to the database
+        event = Event(
+            thread_id=str(thread.id),
+            message_id=str(message.id),
+            creator_id=str(interaction.user.id),
+            name=event_name,
+            description=description,
+            participants=[str(interaction.user.id)],
+        )
+        await event.insert()
 
         # Cache the event data
-        await self.redis.set(f"{self.cog.REDIS_PREFIX}:{str(thread.id)}", json.dumps(event_data, default=str), ex=self.cog.REDIS_TTL)
+        await self.redis.set(
+            f"{self.cog.REDIS_PREFIX}:{str(thread.id)}", json.dumps(event.model_dump(), default=str), ex=self.cog.REDIS_TTL
+        )
 
         embed = SuccessEmbed(
-            description=f"""Event **{event_name}** has been created in {thread.mention}!
+            title="Event Created",
+            description=f"""**{event_name}** has been created in {thread.mention}.
             You've been automatically added as a participant.""",
         )
         await interaction.followup.send(embed=embed, ephemeral=True)

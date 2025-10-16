@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING
 
 import discord
 
+from models.events import Event
+
 if TYPE_CHECKING:
     from cogs.events import EventsCog
 
@@ -9,24 +11,24 @@ if TYPE_CHECKING:
 class EventSelectionView(discord.ui.View):
     """View for selecting events with dropdown (currently only used for joining)."""
 
-    def __init__(self, cog: "EventsCog", events: list, user_id: int):
+    def __init__(self, cog: "EventsCog", events: list[Event], user_id: int):
         super().__init__(timeout=300)
 
-        self.cog = cog
-        self.events = events
-        self.user_id = user_id
+        self.cog: "EventsCog" = cog
+        self.events: list[Event] = events
+        self.user_id: int = user_id
 
         # Create dropdown with events
         options = []
         for event in events:
             # Check if user is already in this event
-            is_member = str(user_id) in event["participants"]
-            emoji = "✅" if is_member else "🏆"
-            participant_text = "Already joined" if is_member else f"{len(event['participants'])} participants"
-            description = f"{participant_text} • {len(event['loot_entries'])} items"
+            is_participant = str(user_id) in event.participants
+            emoji = "✅" if is_participant else "🏆"
+            participant_text = "Already joined" if is_participant else f"{len(event.participants)} participants"
+            description = f"{participant_text} • {len(event.loot_entries)} items"
 
             options.append(
-                discord.SelectOption(label=event["name"][:100], value=str(event["thread_id"]), description=description[:100], emoji=emoji)
+                discord.SelectOption(label=event.name[:100], value=str(event.thread_id), description=description[:100], emoji=emoji)
             )
 
         if options:

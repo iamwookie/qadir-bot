@@ -1,34 +1,35 @@
 import discord
 
+from models.events import LootEntry
+from utils.enums import EventStatus
+
 
 class EventEmbed(discord.Embed):
     """
     A custom embed class for displaying event information.
     """
 
-    def __init__(self, name: str, description: str, status: str, participants: list, loot_entries: list, **kwargs) -> None:
+    def __init__(self, name: str, desc: str, status: EventStatus, participants: list[str], loot_entries: list[LootEntry], **kwargs) -> None:
         super().__init__(
-            title=f"Event: {name}",
-            description=description,
-            colour=discord.Colour.green() if status == "active" else discord.Colour.red(),
+            title=name,
+            description=desc,
+            colour=discord.Colour.green() if status == EventStatus.ACTIVE else discord.Colour.red(),
             **kwargs,
         )
 
-        self.data = {
-            "name": name,
-            "description": description,
-            "status": status,
-            "participants": participants,
-            "loot_entries": loot_entries,
-        }
+        self._name = name
+        self._desc = desc
+        self._status = status
+        self._participants = participants
+        self._loot_entries = loot_entries
 
-        status_emoji = "🟢" if self.data["status"] == "active" else "🔴"
+        status_emoji = "🟢" if self._status == EventStatus.ACTIVE else "🔴"
 
-        self.add_field(name="Status", value=f"{status_emoji} `{self.data['status'].capitalize()}`", inline=True)
-        self.add_field(name="Total Participants", value=f"`{len(self.data['participants'])}`", inline=True)
+        self.add_field(name="Status", value=f"{status_emoji} `{self._status.name.capitalize()}`", inline=True)
+        self.add_field(name="Total Participants", value=f"`{len(self._participants)}`", inline=True)
         self.add_field(name="Total Items", value=f"`{self.total_items()}`", inline=True)
 
-        participants = ", ".join([f"<@{participant_id}>" for participant_id in self.data["participants"]])
+        participants = ", ".join([f"<@{participant_id}>" for participant_id in self._participants]) or "*No participants yet*"
 
         self.add_field(name="Participants", value=participants[:1024], inline=False)
         self.add_field(name="Loot Breakdown", value=self.loot_breakdown(), inline=False)
@@ -45,14 +46,14 @@ class EventEmbed(discord.Embed):
             int: The number of unique item types (not quantities)
         """
 
-        if not self.data.get("loot_entries"):
+        if not self._loot_entries:
             return 0
 
         # Use a set to store unique item IDs
         unique_item_ids = set()
 
-        for entry in self.data["loot_entries"]:
-            item_id = entry["item"]["id"]
+        for entry in self._loot_entries:
+            item_id = entry.item.id
             unique_item_ids.add(item_id)
 
         return len(unique_item_ids)
@@ -65,16 +66,16 @@ class EventEmbed(discord.Embed):
             str: Formatted loot breakdown by participant
         """
 
-        if not self.data.get("loot_entries"):
+        if not self._loot_entries:
             return "*No loot added yet - use `/event loot` to contribute!*"
 
         # Aggregate by user and item
-        user_item_totals = {}
-        for entry in self.data["loot_entries"]:
-            user_id = entry["added_by"]
-            item_id = entry["item"]["id"]
-            item_name = entry["item"]["name"]
-            quantity = entry["quantity"]
+        user_item_totals: dict[int, dict[int, dict[str, int]]] = {}
+        for entry in self._loot_entries:
+            user_id = entry.added_by
+            item_id = entry.item.id
+            item_name = entry.item.name
+            quantity = entry.quantity
 
             if user_id not in user_item_totals:
                 user_item_totals[user_id] = {}
@@ -85,7 +86,7 @@ class EventEmbed(discord.Embed):
                 user_item_totals[user_id][item_id] = {"name": item_name, "quantity": quantity}
 
         # Create breakdown lines per user
-        breakdown_lines = []
+        breakdown_lines: list[str] = []
         for user_id in sorted(user_item_totals.keys()):
             user_mention = f"<@{user_id}>"
             user_items = []
@@ -103,17 +104,17 @@ class EventEmbed(discord.Embed):
             str: Formatted loot distribution
         """
 
-        if not self.data.get("loot_entries"):
+        if not self._loot_entries:
             return "*Distribution will be calculated once loot is added.*"
 
-        participant_count = len(self.data["participants"])
+        participant_count = len(self._participants)
 
         # Aggregate quantities by item ID
-        loot_summary = {}
-        for entry in self.data["loot_entries"]:
-            item_id = entry["item"]["id"]
-            item_name = entry["item"]["name"]
-            quantity = entry["quantity"]
+        loot_summary: dict[int, dict[str, int]] = {}
+        for entry in self._loot_entries:
+            item_id = entry.item.id
+            item_name = entry.item.name
+            quantity = entry.quantity
 
             if item_id in loot_summary:
                 loot_summary[item_id]["quantity"] += quantity
@@ -121,7 +122,7 @@ class EventEmbed(discord.Embed):
                 loot_summary[item_id] = {"name": item_name, "quantity": quantity}
 
         # Create distribution lines
-        distribution_lines = []
+        distribution_lines: list[str] = []
         for data in loot_summary.values():
             total_quantity = data["quantity"]
             item_name = data["name"]
