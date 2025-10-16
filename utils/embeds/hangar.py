@@ -28,11 +28,11 @@ class HangarEmbed(discord.Embed):
 
         # Discord timestamp field - shows exact time in user's timezone
         next_status_change: datetime = state["next_status_change"]
-        self.add_field(name="⏰ Next Status Change", value=f"<t:{dt_to_psx(next_status_change)}:R>", inline=True)
+        self.add_field(name="⏰ Next Status Change", value=f"<t:{int(dt_to_psx(next_status_change))}:R>", inline=True)
 
         # Discord timestamp field - shows exact time in user's timezone
         next_light_change: datetime = state["next_light_change"]
-        self.add_field(name="⏰ Next Light Change", value=f"<t:{dt_to_psx(next_light_change)}:R>", inline=True)
+        self.add_field(name="⏰ Next Light Change", value=f"<t:{int(dt_to_psx(next_light_change))}:R>", inline=True)
 
         # LED lights status (visual indicator)
         lights_display = " ".join(state["lights"])
