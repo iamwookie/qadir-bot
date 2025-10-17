@@ -1,7 +1,7 @@
 from beanie import Document
 
 
-class HangarEmbedData(Document):
+class HangarEmbedItem(Document):
     """Beanie document model for hangar embed data."""
 
     message_id: str

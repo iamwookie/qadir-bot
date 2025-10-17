@@ -7,7 +7,7 @@ from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
-from models.hangar import HangarEmbedData
+from models.hangar import HangarEmbedItem
 from utils import dt_to_psx
 from utils.embeds import ErrorEmbed, HangarEmbed
 
@@ -174,7 +174,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             "next_light_change": next_light_change,
         }
 
-    async def _get_or_fetch_hangar_data(self) -> list[HangarEmbedData] | None:
+    async def _get_or_fetch_hangar_data(self) -> list[HangarEmbedItem] | None:
         """
         Retrieve a list of all hangar embed data.
 
@@ -182,23 +182,23 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             message_id (int): The message ID of the hangar
 
         Returns:
-            list[HangarEmbedData] | None: A list of HangarEmbedData, or None
+            list[HangarEmbedItem] | None: A list of HangarEmbedItem, or None
         """
 
         try:
             cached = await self.redis.get(f"{self._REDIS_PREFIX}:embeds")
             if cached:
-                return [HangarEmbedData(**json.loads(item)) for item in json.loads(cached)]
+                return [HangarEmbedItem(**json.loads(item)) for item in json.loads(cached)]
 
-            data = await HangarEmbedData.find_all().to_list()
-            if data:
+            items = await HangarEmbedItem.find_all().to_list()
+            if items:
                 # Cache the data in Redis for future use
                 await self.redis.set(
                     f"{self._REDIS_PREFIX}:embeds",
-                    json.dumps([item.model_dump() for item in data], default=str),
+                    json.dumps([item.model_dump() for item in items], default=str),
                     ex=self._REDIS_TTL,
                 )
-                return data
+                return items
 
             return None
         except Exception:
@@ -212,8 +212,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         logger.debug("⌛ [HANGAR] Processing Hangar Embeds...")
 
         # Get all tracked embed message IDs
-        embeds_data = await HangarEmbedData.find_all().to_list()
-        if not embeds_data:
+        embed_items = await HangarEmbedItem.find_all().to_list()
+        if not embed_items:
             logger.debug("⌛ [HANGAR] No Hangar Embeds To Process")
             return
 
@@ -223,10 +223,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         processed = 0
 
         # Update each tracked embed
-        for embed_data in embeds_data:
+        for embed_item in embed_items:
             try:
-                channel_id = int(embed_data.channel_id)
-                message_id = int(embed_data.message_id)
+                channel_id = int(embed_item.channel_id)
+                message_id = int(embed_item.message_id)
 
                 message = await self.bot.get_message(message_id)
                 if not message:
@@ -240,11 +240,11 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
                 processed += 1
             except discord.NotFound:
-                logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_data.message_id}")
+                logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_item.message_id}")
                 # Remove the missing embed from tracking
-                await embed_data.delete()
+                await embed_item.delete()
             except Exception:
-                logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_data.message_id}")
+                logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_item.message_id}")
 
         next_light_change: datetime = state["next_light_change"]
 
@@ -293,12 +293,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             message = await ctx.followup.send(embed=embed)
 
             # Track this embed for updates
-            embed_data = HangarEmbedData(
+            embed_item = HangarEmbedItem(
                 message_id=str(message.id),
                 channel_id=str(ctx.channel.id),
                 guild_id=str(ctx.guild.id),
             )
-            await embed_data.insert()
+            await embed_item.insert()
 
             # Invalidate the cache
             await self.redis.delete(f"{self._REDIS_PREFIX}:embeds")
