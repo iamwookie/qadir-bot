@@ -284,15 +284,21 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         await ctx.defer()
 
+        # Calculate current state
+        state = self._calculate_hangar_state()
+        embed = HangarEmbed(state)
+
+        # Send the embed
         try:
-            # Calculate current state
-            state = self._calculate_hangar_state()
-            embed = HangarEmbed(state)
+            message: discord.Message = await ctx.channel.send(embed=embed)
+        except Exception:
+            logger.exception("[HANGAR] Error Sending Hangar Embed")
+            embed = ErrorEmbed(description="Failed to create the hangar embed. Are you sure I have permissions?")
+            await ctx.followup.send(embed=embed, ephemeral=True)
+            return
 
-            # Send the embed
-            message = await ctx.followup.send(embed=embed)
-
-            # Track this embed for updates
+        # Track this embed for updates
+        try:
             embed_item = HangarEmbedItem(
                 message_id=str(message.id),
                 channel_id=str(ctx.channel.id),
@@ -302,11 +308,14 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
             # Invalidate the cache
             await self.redis.delete(f"{self._REDIS_PREFIX}:embeds")
-
-            logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
         except Exception:
-            logger.exception("[HANGAR] Error Creating Hangar Embed")
-            await ctx.followup.send(embed=ErrorEmbed(description="Failed to create the hangar embed. Please try again."), ephemeral=True)
+            logger.exception("[HANGAR] Error Saving HangarEmbedItem")
+            embed = ErrorEmbed(description="Failed to create the hangar embed. Please try again.")
+            await ctx.followup.send(embed=embed, ephemeral=True)
+            await message.delete()
+            return
+
+        logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
 
 
 def setup(bot: Qadir) -> None:
