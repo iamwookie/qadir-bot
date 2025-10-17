@@ -40,7 +40,13 @@ class Qadir(discord.Bot):
         """Called when the bot is ready."""
 
         await init_beanie(
-            database=self.db, document_models=["models.activities.Activity", "models.proposals.Proposal", "models.events.Event"]
+            database=self.db,
+            document_models=[
+                "models.activities.Activity",
+                "models.proposals.Proposal",
+                "models.events.Event",
+                "models.hangar.HangarEmbedItem",
+            ],
         )
 
         for cog in self.cogs:
