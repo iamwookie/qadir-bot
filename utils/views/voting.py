@@ -7,7 +7,7 @@ from models.proposals import Proposal
 from utils.embeds import ErrorEmbed, SuccessEmbed
 
 if TYPE_CHECKING:
-    from cogs.proposals import ProposalsCog
+    pass
 
 logger = logging.getLogger("qadir")
 
@@ -22,7 +22,7 @@ class VotingView(discord.ui.View):
     A view for voting that uses buttons instead of reactions.
     """
 
-    def __init__(self, cog: "ProposalsCog", thread_id: int) -> None:
+    def __init__(self, thread_id: int) -> None:
         super().__init__(timeout=None)
 
         self.thread_id: int = thread_id

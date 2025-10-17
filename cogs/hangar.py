@@ -7,8 +7,9 @@ from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
+from models.hangar import HangarEmbedData
 from utils import dt_to_psx
-from utils.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
+from utils.embeds import ErrorEmbed, HangarEmbed
 
 GUILD_IDS = config["hangar"]["guilds"]
 
@@ -20,10 +21,18 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     A cog to manage executive hangar timers and tracking.
     """
 
-    REDIS_PREFIX: str = "qadir:hangar"
+    _REDIS_PREFIX: str = "qadir:hangar"
+    _REDIS_TTL: int = 3600  # seconds
+
+    _OPEN_DURATION: int = 3900385  # milliseconds
+    _CLOSE_DURATION: int = 7200711  # milliseconds
+    _CYCLE_DURATION: int = _OPEN_DURATION + _CLOSE_DURATION
+
+    # Original Timestamp: 2025-09-21T00:04:27.222-04:00 (EDT, UTC-4)
+    _INITIAL_OPEN_TIME: datetime = datetime(2025, 9, 21, 0, 4, 27, 222000, timezone(timedelta(hours=-4))).astimezone(timezone.utc)
 
     # Define the hangar lights thresholds
-    THRESHOLDS: list[dict] = [
+    _THRESHOLDS: list[dict] = [
         {"min": 0, "max": 12 * 60 * 1000, "colors": ["green", "green", "green", "green", "green"]},  # Online 5G
         {"min": 12 * 60 * 1000, "max": 24 * 60 * 1000, "colors": ["green", "green", "green", "green", "empty"]},  # Online 4G1E
         {"min": 24 * 60 * 1000, "max": 36 * 60 * 1000, "colors": ["green", "green", "green", "empty", "empty"]},  # Online 3G2E
@@ -40,23 +49,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     def __init__(self, bot: Qadir) -> None:
         super().__init__(bot)
 
-        # Timing constants from exec.xyxll.com
-        self.OPEN_DURATION = 3900385  # milliseconds
-        self.CLOSE_DURATION = 7200711  # milliseconds
-        self.CYCLE_DURATION = self.OPEN_DURATION + self.CLOSE_DURATION
-
-        # Original Timestamp: 2025-09-21T00:04:27.222-04:00 (EDT, UTC-4)
-        eastern_tz = timezone(timedelta(hours=-4))
-        initial_time_edt = datetime(2025, 9, 21, 0, 4, 27, 222000, eastern_tz)
-        self.INITIAL_OPEN_TIME = initial_time_edt.astimezone(timezone.utc)
-
         # Start cog tasks
-        self.process_hangar_embeds.start()
+        # self.process_hangar_embeds.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
 
-        self.process_hangar_embeds.cancel()
+        self._process_hangar_embeds.cancel()
 
     def _get_next_status_change(self, current_time: datetime) -> dict:
         """
@@ -69,18 +68,18 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             dict: A dictionary containing the next status change information
         """
 
-        elapsed_time_since_initial_open = current_time - self.INITIAL_OPEN_TIME
+        elapsed_time_since_initial_open = current_time - self._INITIAL_OPEN_TIME
         elapsed_ms = elapsed_time_since_initial_open.total_seconds() * 1000
-        time_in_current_cycle = elapsed_ms % self.CYCLE_DURATION
+        time_in_current_cycle = elapsed_ms % self._CYCLE_DURATION
 
-        if time_in_current_cycle < self.OPEN_DURATION:
+        if time_in_current_cycle < self._OPEN_DURATION:
             # Hangars are online
-            next_status_change = current_time + timedelta(milliseconds=(self.OPEN_DURATION - time_in_current_cycle))
+            next_status_change = current_time + timedelta(milliseconds=(self._OPEN_DURATION - time_in_current_cycle))
             return {"status": "ONLINE", "next_status_change": next_status_change}
         else:
             # Hangars are offline
-            remaining_close_duration = time_in_current_cycle - self.OPEN_DURATION
-            next_status_change = current_time + timedelta(milliseconds=(self.CLOSE_DURATION - remaining_close_duration))
+            remaining_close_duration = time_in_current_cycle - self._OPEN_DURATION
+            next_status_change = current_time + timedelta(milliseconds=(self._CLOSE_DURATION - remaining_close_duration))
             return {"status": "OFFLINE", "next_status_change": next_status_change}
 
     def _get_next_light_change(self, current_time: datetime, time_in_cycle: float) -> datetime:
@@ -97,24 +96,24 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         # Find which threshold we're in
         current_threshold_index = None
-        for i, threshold in enumerate(self.THRESHOLDS):
+        for i, threshold in enumerate(self._THRESHOLDS):
             if time_in_cycle >= threshold["min"] and time_in_cycle < threshold["max"]:
                 current_threshold_index = i
                 break
 
         # If no threshold found, we're beyond the defined ranges (last threshold)
         if current_threshold_index is None:
-            current_threshold_index = len(self.THRESHOLDS) - 1
+            current_threshold_index = len(self._THRESHOLDS) - 1
 
         # Calculate next light change time
-        if current_threshold_index < len(self.THRESHOLDS) - 1:
+        if current_threshold_index < len(self._THRESHOLDS) - 1:
             # Next change is at the end of current threshold (start of next threshold)
-            current_threshold = self.THRESHOLDS[current_threshold_index]
+            current_threshold = self._THRESHOLDS[current_threshold_index]
             time_until_next_change_ms: float = (current_threshold["max"] - time_in_cycle) + 1000
             return current_time + timedelta(milliseconds=time_until_next_change_ms)
         else:
             # We're in the last threshold, next change is start of next cycle
-            time_until_next_cycle_ms: float = (self.CYCLE_DURATION - time_in_cycle) + 1000
+            time_until_next_cycle_ms: float = (self._CYCLE_DURATION - time_in_cycle) + 1000
             return current_time + timedelta(milliseconds=time_until_next_cycle_ms)
 
     def _calculate_hangar_state(self) -> dict:
@@ -129,13 +128,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         status_info = self._get_next_status_change(current_time)
 
         # Calculate time in current cycle
-        elapsed_time_since_initial_open = current_time - self.INITIAL_OPEN_TIME
+        elapsed_time_since_initial_open = current_time - self._INITIAL_OPEN_TIME
         elapsed_ms = elapsed_time_since_initial_open.total_seconds() * 1000
-        time_in_cycle = elapsed_ms % self.CYCLE_DURATION
+        time_in_cycle = elapsed_ms % self._CYCLE_DURATION
 
         # Find which threshold we're in
         current_threshold = None
-        for threshold in self.THRESHOLDS:
+        for threshold in self._THRESHOLDS:
             if time_in_cycle >= threshold["min"] and time_in_cycle < threshold["max"]:
                 current_threshold = threshold
                 break
@@ -144,7 +143,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         if not current_threshold:
             # This handles the case where time_in_cycle >= 185*60*1000 (11100000ms)
             # Use the last threshold to maintain the current state during the gap
-            current_threshold = self.THRESHOLDS[-1]
+            current_threshold = self._THRESHOLDS[-1]
 
         # Convert colors to emojis
         lights = []
@@ -165,7 +164,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             color = 0xFF0000  # Red
 
         next_status_change: datetime = status_info["next_status_change"]
-        next_light_change: datetime = self._get_next_light_change(current_time, time_in_cycle)
+        next_light_change = self._get_next_light_change(current_time, time_in_cycle)
 
         return {
             "status": status,
@@ -175,16 +174,46 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             "next_light_change": next_light_change,
         }
 
+    async def _get_or_fetch_hangar_data(self) -> list[HangarEmbedData] | None:
+        """
+        Retrieve a list of all hangar embed data.
+
+        Args:
+            message_id (int): The message ID of the hangar
+
+        Returns:
+            list[HangarEmbedData] | None: A list of HangarEmbedData, or None
+        """
+
+        try:
+            cached = await self.redis.get(f"{self._REDIS_PREFIX}:embeds")
+            if cached:
+                return [HangarEmbedData(**json.loads(item)) for item in json.loads(cached)]
+
+            data = await HangarEmbedData.find_all().to_list()
+            if data:
+                # Cache the data in Redis for future use
+                await self.redis.set(
+                    f"{self._REDIS_PREFIX}:embeds",
+                    json.dumps([item.model_dump() for item in data], default=str),
+                    ex=self._REDIS_TTL,
+                )
+                return data
+
+            return None
+        except Exception:
+            logger.exception("[HANGAR] Error Fetching Hangar Embed Data")
+            return None
+
     @tasks.loop(minutes=1)
-    async def process_hangar_embeds(self):
+    async def _process_hangar_embeds(self):
         """Update all tracked hangar embeds dynamically or every minute."""
 
         logger.debug("⌛ [HANGAR] Processing Hangar Embeds...")
 
         # Get all tracked embed message IDs
-        embed_ids = await self.redis.smembers(f"{self.REDIS_PREFIX}:embeds")
-
-        if not embed_ids:
+        embeds_data = await HangarEmbedData.find_all().to_list()
+        if not embeds_data:
             logger.debug("⌛ [HANGAR] No Hangar Embeds To Process")
             return
 
@@ -194,42 +223,43 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         processed = 0
 
         # Update each tracked embed
-        for embed_data_raw in embed_ids:
+        for embed_data in embeds_data:
             try:
-                embed_data = json.loads(embed_data_raw)
-                channel_id = embed_data["channel_id"]
-                message_id = embed_data["message_id"]
+                channel_id = int(embed_data.channel_id)
+                message_id = int(embed_data.message_id)
 
-                # Get channel and message
-                channel = self.bot.get_channel(channel_id)
-                if not channel:
-                    channel = await self.bot.fetch_channel(channel_id)
+                message = await self.bot.get_message(message_id)
+                if not message:
+                    channel = await self.bot.get_channel(channel_id)
+                    if not channel:
+                        channel = await self.bot.fetch_channel(channel_id)
 
-                message = await channel.fetch_message(message_id)
+                    message = await channel.fetch_message(message_id)
+
                 await message.edit(embed=embed)
 
                 processed += 1
             except discord.NotFound:
-                logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_data_raw}")
+                logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_data.message_id}")
                 # Remove the missing embed from tracking
-                await self.redis.srem("self.REDIS_PREFIX:embeds", embed_data_raw)
+                await embed_data.delete()
             except Exception:
-                logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_data_raw}")
+                logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_data.message_id}")
 
         next_light_change: datetime = state["next_light_change"]
 
         # Update task interval to run at the next light change time
-        self.process_hangar_embeds.change_interval(time=[next_light_change.time()])
+        self._process_hangar_embeds.change_interval(time=[next_light_change.time()])
         logger.debug(f"⌛ [HANGAR] Processing Hangar Embeds Rescheduled To: {dt_to_psx(next_light_change)}")
         logger.debug(f"⌛ [HANGAR] Processed {processed} Hangar Embeds")
 
-    @process_hangar_embeds.before_loop
+    @_process_hangar_embeds.before_loop
     async def before_process_hangar_embeds(self):
         """Wait for bot to be initialised before processing hangar embeds."""
 
         await self.bot.wait_until_initialised()
 
-    @process_hangar_embeds.error
+    @_process_hangar_embeds.error
     async def process_hangar_embeds_error(self, error: Exception):
         """
         Handle errors in the process_hangar_embeds loop.
@@ -244,7 +274,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
 
     @hangar.command(description="Create an embed to track the executive hangar status")
-    async def show(self, ctx: discord.ApplicationContext) -> None:
+    async def create(self, ctx: discord.ApplicationContext) -> None:
         """
         Send an embed that displays the current hangar status with a live updating timer.
 
@@ -263,50 +293,20 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             message = await ctx.followup.send(embed=embed)
 
             # Track this embed for updates
-            embed_data = {
-                "channel_id": ctx.channel.id,
-                "message_id": message.id,
-                "created_by": ctx.author.id,
-                "created_at": dt_to_psx(discord.utils.utcnow()),
-            }
+            embed_data = HangarEmbedData(
+                message_id=str(message.id),
+                channel_id=str(ctx.channel.id),
+                guild_id=str(ctx.guild.id),
+            )
+            await embed_data.insert()
 
-            await self.redis.sadd("self.REDIS_PREFIX:embeds", json.dumps(embed_data))
+            # Invalidate the cache
+            await self.redis.delete(f"{self._REDIS_PREFIX}:embeds")
+
             logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
         except Exception:
             logger.exception("[HANGAR] Error Creating Hangar Embed")
             await ctx.followup.send(embed=ErrorEmbed(description="Failed to create the hangar embed. Please try again."), ephemeral=True)
-
-    @hangar.command(description="Manually refresh the cycle data")
-    async def update(self, ctx: discord.ApplicationContext) -> None:
-        """
-        Manually trigger a refresh of the cycle data of all hangar status embeds.
-
-        Args:
-            ctx (discord.ApplicationContext): The application context
-        """
-
-        await ctx.defer(ephemeral=True)
-
-        try:
-            # Get tracked embeds count
-            embed_ids = await self.redis.smembers("self.REDIS_PREFIX:embeds")
-            embed_count = len(embed_ids)
-
-            if embed_count == 0:
-                await ctx.followup.send(embed=ErrorEmbed(None, "No hangar timers are currently being tracked."), ephemeral=True)
-                return
-
-            # Manually trigger the update task
-            await self.process_hangar_embeds()
-
-            await ctx.followup.send(
-                embed=SuccessEmbed(title="✅ Update Complete", description=f"Successfully updated {embed_count} hangar timer(s)."),
-                ephemeral=True,
-            )
-
-        except Exception:
-            logger.exception("[HANGAR] Error In Manual Update")
-            await ctx.followup.send(embed=ErrorEmbed(description="Failed to update hangar timers. Please try again."), ephemeral=True)
 
 
 def setup(bot: Qadir) -> None:

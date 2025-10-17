@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from models.events import Event
+from utils.embeds import ErrorEmbed, SuccessEmbed
 
 if TYPE_CHECKING:
     from cogs.events import EventsCog
@@ -18,51 +19,50 @@ class EventSelectionView(discord.ui.View):
         self.events: list[Event] = events
         self.user_id: int = user_id
 
-        # Create dropdown with events
-        options = []
-        for event in events:
-            # Check if user is already in this event
-            is_participant = str(user_id) in event.participants
-            emoji = "✅" if is_participant else "🏆"
-            participant_text = "Already joined" if is_participant else f"{len(event.participants)} participants"
-            description = f"{participant_text} • {len(event.loot_entries)} items"
-
-            options.append(
-                discord.SelectOption(label=event.name[:100], value=str(event.thread_id), description=description[:100], emoji=emoji)
-            )
-
-        if options:
-            select = EventSelect(self.cog, options)
-            self.add_item(select)
+        select = EventSelect(self.cog, self.events, self.user_id)
+        self.add_item(select)
 
 
 class EventSelect(discord.ui.Select):
     """Dropdown for event selection."""
 
-    def __init__(self, cog: "EventsCog", options: list):
-        super().__init__(placeholder="Choose an event to join...", options=options, min_values=1, max_values=1)
+    def __init__(self, cog: "EventsCog", events: list[Event], user_id: int):
+        super().__init__(placeholder="Choose an event to join...", min_values=1, max_values=1)
 
-        self.cog = cog
+        self.cog: "EventsCog" = cog
         self.redis = cog.redis
-        self.db = cog.db
+        self.events: list[Event] = events
+        self.user_id: int = user_id
+
+        for event in self.events:
+            is_participant = str(self.user_id) in event.participants
+            participant_text = "Already joined" if is_participant else f"{len(event.participants)} participants"
+            description = f"{participant_text} • {len(event.loot_entries)} items"
+            emoji = "✅" if is_participant else "🏆"
+            self.add_option(
+                discord.SelectOption(label=event.name[:100], value=str(event.thread_id), description=description[:100], emoji=emoji)
+            )
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
         selected_thread_id = int(self.values[0])
 
-        event_data = await self.cog.fetch_event_by_id(selected_thread_id)
-        if not event_data:
-            await interaction.followup.send("❌ Event not found.", ephemeral=True)
+        event = await self.cog.get_or_fetch_event_by_id(selected_thread_id)
+        if not event:
+            embed = ErrorEmbed(title="Event Not Found", description="The event you are trying to join does not exist.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # Check if user is already a participant
-        if str(interaction.user.id) in event_data["participants"]:
-            await interaction.followup.send("✅ You're already participating in this event!", ephemeral=True)
+        if str(interaction.user.id) in event.participants:
+            embed = SuccessEmbed(title="Already Participating", description="You're already participating in this event.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # Add user to participants
-        await self.cog.db.update_one({"thread_id": str(selected_thread_id)}, {"$push": {"participants": str(interaction.user.id)}})
+        event.participants.append(str(interaction.user.id))
+        await event.replace()
 
         # Invalidate relevant caches
         pipeline = self.redis.pipeline()
@@ -72,8 +72,7 @@ class EventSelect(discord.ui.Select):
         await pipeline.exec()
 
         # Update the event card with new participant
-        await self.cog.update_event_card(event_data)
+        await self.cog.update_event_card(event)
 
-        await interaction.followup.send(
-            f"🎉 Successfully joined **{event_data['name']}**!\n" f"You can now add loot items to this event.", ephemeral=True
-        )
+        embed = SuccessEmbed(title="Joined Event", description=f"You have successfully joined **{event.name}**.")
+        await interaction.followup.send(embed=embed, ephemeral=True)

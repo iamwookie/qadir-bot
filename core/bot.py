@@ -10,8 +10,6 @@ from pymongo.asynchronous.database import AsyncDatabase
 from upstash_redis.asyncio import Redis
 
 from config import MONGODB_URI, PYTHON_ENV, config
-from models.events import Event
-from models.proposals import Proposal
 from utils.embeds import ErrorEmbed
 
 logger = logging.getLogger("qadir")
@@ -41,7 +39,9 @@ class Qadir(discord.Bot):
     async def on_ready(self) -> None:
         """Called when the bot is ready."""
 
-        await init_beanie(database=self.db, document_models=[Proposal, Event])
+        await init_beanie(
+            database=self.db, document_models=["models.activities.Activity", "models.proposals.Proposal", "models.events.Event"]
+        )
 
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")

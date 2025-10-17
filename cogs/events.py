@@ -35,17 +35,14 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
-        # MongoDB collection wrapper
-        self.db = self.bot.db["events"]
-
     async def get_or_fetch_event_by_id(self, thread_id: int) -> Event | None:
         """
         Fetch event data by thread ID. Uses cache if available.
 
         Args:
-            thread_id (int): The Discord thread ID of the event.
+            thread_id (int): The Discord thread ID of the event
         Returns:
-            An Event object, or None.
+            An Event object, or None
         """
 
         try:
@@ -56,7 +53,9 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             event = await Event.find_one(Event.thread_id == str(thread_id))
             if event:
                 await self.redis.set(
-                    f"{self.REDIS_PREFIX}:{str(thread_id)}", json.dumps(event.model_dump(), default=str), ex=self.REDIS_TTL
+                    f"{self.REDIS_PREFIX}:{str(thread_id)}",
+                    json.dumps(event.model_dump(), default=str),
+                    ex=self.REDIS_TTL,
                 )
                 return event
 
@@ -104,7 +103,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             # Update the message
             await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
 
-            logger.info(f"[EVENTS] Updated Event Card For: {thread_id} ({event.name})")
+            logger.debug(f"[EVENTS] Updated Event Card For: {thread_id} ({event.name})")
         except Exception:
             logger.exception("[EVENTS] Failed To Update Event Card")
 

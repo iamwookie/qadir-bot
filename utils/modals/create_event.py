@@ -85,7 +85,9 @@ class CreateEventModal(discord.ui.Modal):
 
         # Cache the event data
         await self.redis.set(
-            f"{self.cog.REDIS_PREFIX}:{str(thread.id)}", json.dumps(event.model_dump(), default=str), ex=self.cog.REDIS_TTL
+            f"{self.cog.REDIS_PREFIX}:{str(thread.id)}",
+            json.dumps(event.model_dump(), default=str),
+            ex=self.cog.REDIS_TTL,
         )
 
         embed = SuccessEmbed(

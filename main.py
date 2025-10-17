@@ -30,7 +30,7 @@ if __name__ == "__main__":
     bot = Qadir(intents=intents)
 
     bot.load_extension("cogs.utility")
-    # bot.load_extension("cogs.activities")
+    bot.load_extension("cogs.activities")
     bot.load_extension("cogs.proposals")
     bot.load_extension("cogs.events")
     bot.load_extension("cogs.hangar")
