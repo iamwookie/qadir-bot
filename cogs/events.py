@@ -103,7 +103,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             # Update the message
             await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
 
-            logger.info(f"[EVENTS] Updated Event Card For: {thread_id} ({event.name})")
+            logger.debug(f"[EVENTS] Updated Event Card For: {thread_id} ({event.name})")
         except Exception:
             logger.exception("[EVENTS] Failed To Update Event Card")
 
