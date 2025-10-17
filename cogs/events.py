@@ -35,9 +35,6 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
-        # MongoDB collection wrapper
-        self.db = self.bot.db["events"]
-
     async def get_or_fetch_event_by_id(self, thread_id: int) -> Event | None:
         """
         Fetch event data by thread ID. Uses cache if available.

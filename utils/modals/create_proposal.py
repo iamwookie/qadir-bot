@@ -12,7 +12,7 @@ from ..enums import ProposalStatus
 from ..views import VotingView
 
 if TYPE_CHECKING:
-    from cogs.proposals import ProposalsCog
+    pass
 
 CHANNEL_ID: int = config["proposals"]["channels"][0]
 
@@ -22,10 +22,8 @@ logger = logging.getLogger("qadir")
 class CreateProposalModal(discord.ui.Modal):
     """Modal for creating a proposal."""
 
-    def __init__(self, cog: "ProposalsCog", *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-
-        self.cog = cog
 
         self.add_item(discord.ui.InputText(label="Title", max_length=64, style=discord.InputTextStyle.short, required=True))
         self.add_item(discord.ui.InputText(label="Summary", max_length=2048, style=discord.InputTextStyle.long, required=True))
@@ -62,18 +60,19 @@ class CreateProposalModal(discord.ui.Modal):
             thread.send(embed=summary_embed),
             thread.send(embed=reasoning_embed),
             thread.send(embed=outcome_embed),
-            thread.send(embed=poll_embed, view=VotingView(self.cog, thread_id=thread.id)),
+            thread.send(embed=poll_embed, view=VotingView(thread.id)),
         )
 
-        await Proposal(
+        proposal = Proposal(
             thread_id=str(thread.id),
             message_id=str(result[-1].id),
             creator_id=str(interaction.user.id),
             created_at=discord.utils.utcnow(),
             status=ProposalStatus.ACTIVE,
-        ).insert()
+        )
+        await proposal.insert()
 
         embed = SuccessEmbed(title="Proposal Created", description=f"Your proposal has been created in {thread.mention}.")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-        logger.info(f"✅ [PROPOSALS] Proposal Created: {thread.id} ({title})")
+        logger.info(f"✅ [PROPOSALS] Proposal Created: {proposal.thread_id} ({title})")

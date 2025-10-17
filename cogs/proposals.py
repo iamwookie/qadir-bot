@@ -33,14 +33,14 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         super().__init__(bot)
 
         # Start cog tasks
-        self.process_proposals.start()
-        self.restore_voting_views.start()
+        self._process_proposals.start()
+        self._restore_voting_views.start()
 
     def cog_unload(self):
         """Clean up tasks when cog is unloaded."""
 
-        self.process_proposals.cancel()
-        self.restore_voting_views.cancel()
+        self._process_proposals.cancel()
+        self._restore_voting_views.cancel()
 
     async def cog_check(self, ctx: discord.ApplicationContext) -> bool:
         """
@@ -55,7 +55,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
 
     @tasks.loop(hours=24)
-    async def process_proposals(self) -> None:
+    async def _process_proposals(self) -> None:
         """
         Process and finalize proposals that are over a day old.
 
@@ -105,13 +105,13 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         logger.debug(f"⌛ [PROPOSALS] [0] Processed {processed} Proposals")
 
-    @process_proposals.before_loop
+    @_process_proposals.before_loop
     async def before_process_proposals(self) -> None:
         """Wait until the bot is initialised before processing proposals."""
 
         await self.bot.wait_until_initialised()
 
-    @process_proposals.error
+    @_process_proposals.error
     async def process_proposals_error(self, error: Exception) -> None:
         """
         Handle errors in the process_proposals loop.
@@ -123,7 +123,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         logger.error("⌛ [PROPOSALS] Error Processing Proposals", exc_info=error)
 
     @tasks.loop(count=1)
-    async def restore_voting_views(self) -> None:
+    async def _restore_voting_views(self) -> None:
         """Restore voting views from MongoDB on bot startup."""
 
         logger.debug("⌛ [PROPOSALS] [1] Restoring Voting Views...")
@@ -149,7 +149,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
                     continue
 
                 # Create and add the view to the message
-                view = VotingView(self, thread.id)
+                view = VotingView(thread.id)
                 self.bot.add_view(view, message_id=message.id)
 
                 restored += 1
@@ -160,13 +160,13 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         logger.debug(f"⌛ [PROPOSALS] [1] Restored {restored} Voting Views")
 
-    @restore_voting_views.before_loop
+    @_restore_voting_views.before_loop
     async def before_restore_voting_views(self) -> None:
         """Wait until the bot is initialised before restoring voting views."""
 
         await self.bot.wait_until_initialised()
 
-    @restore_voting_views.error
+    @_restore_voting_views.error
     async def restore_voting_views_error(self, error: Exception) -> None:
         """
         Handle errors in the restore_voting_views loop.
