@@ -1,9 +1,8 @@
-import discord
-
 from datetime import datetime
 
-from beanie import Document
-from pydantic import BaseModel, Field, computed_field
+import discord
+from beanie import Document, Insert, before_event
+from pydantic import BaseModel, Field
 
 
 class PartialActivity(BaseModel):
@@ -21,17 +20,11 @@ class Activity(Document):
     activity: str
     start_time: datetime
     end_time: datetime = Field(default_factory=discord.utils.utcnow)
+    duration: float = 0.0
 
-    @computed_field
-    @property
-    def duration(self) -> float:
-        return (self.end_time - self.start_time).total_seconds()
+    @before_event(Insert)
+    def set_duration(self):
+        self.duration = (self.end_time - self.start_time).total_seconds()
 
     class Settings:
         name = "activities"
-        indexes = [
-            "user_id",
-            "activity",
-            "start_time",
-            "end_time",
-        ]
