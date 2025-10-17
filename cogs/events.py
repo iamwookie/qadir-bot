@@ -40,9 +40,9 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         Fetch event data by thread ID. Uses cache if available.
 
         Args:
-            thread_id (int): The Discord thread ID of the event.
+            thread_id (int): The Discord thread ID of the event
         Returns:
-            An Event object, or None.
+            An Event object, or None
         """
 
         try:
@@ -53,7 +53,9 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             event = await Event.find_one(Event.thread_id == str(thread_id))
             if event:
                 await self.redis.set(
-                    f"{self.REDIS_PREFIX}:{str(thread_id)}", json.dumps(event.model_dump(), default=str), ex=self.REDIS_TTL
+                    f"{self.REDIS_PREFIX}:{str(thread_id)}",
+                    json.dumps(event.model_dump(), default=str),
+                    ex=self.REDIS_TTL,
                 )
                 return event
 

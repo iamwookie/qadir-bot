@@ -1,9 +1,8 @@
 from beanie import Document
 
 
-
-class HangarEmbed(Document):
-    """Beanie document model for hangar embeds."""
+class HangarEmbedData(Document):
+    """Beanie document model for hangar embed data."""
 
     message_id: str
     channel_id: str

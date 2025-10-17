@@ -7,8 +7,9 @@ from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
+from models.hangar import HangarEmbedData
 from utils import dt_to_psx
-from utils.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
+from utils.embeds import ErrorEmbed, HangarEmbed
 
 GUILD_IDS = config["hangar"]["guilds"]
 
@@ -21,6 +22,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     """
 
     _REDIS_PREFIX: str = "qadir:hangar"
+    _REDIS_TTL: int = 3600  # seconds
 
     _OPEN_DURATION: int = 3900385  # milliseconds
     _CLOSE_DURATION: int = 7200711  # milliseconds
@@ -172,6 +174,37 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             "next_light_change": next_light_change,
         }
 
+    async def _get_or_fetch_hangar_data(self) -> list[HangarEmbedData] | None:
+        """
+        Retrieve a list of all hangar embed data.
+
+        Args:
+            message_id (int): The message ID of the hangar
+
+        Returns:
+            list[HangarEmbedData] | None: A list of HangarEmbedData, or None
+        """
+
+        try:
+            cached = await self.redis.get(f"{self._REDIS_PREFIX}:embeds")
+            if cached:
+                return [HangarEmbedData(**json.loads(item)) for item in json.loads(cached)]
+
+            data = await HangarEmbedData.find_all().to_list()
+            if data:
+                # Cache the data in Redis for future use
+                await self.redis.set(
+                    f"{self._REDIS_PREFIX}:embeds",
+                    json.dumps([item.model_dump() for item in data], default=str),
+                    ex=self._REDIS_TTL,
+                )
+                return data
+
+            return None
+        except Exception:
+            logger.exception("[HANGAR] Error Fetching Hangar Embed Data")
+            return None
+
     @tasks.loop(minutes=1)
     async def _process_hangar_embeds(self):
         """Update all tracked hangar embeds dynamically or every minute."""
@@ -179,9 +212,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         logger.debug("⌛ [HANGAR] Processing Hangar Embeds...")
 
         # Get all tracked embed message IDs
-        embed_ids = await self.redis.smembers(f"{self._REDIS_PREFIX}:embeds")
-
-        if not embed_ids:
+        embeds_data = await HangarEmbedData.find_all().to_list()
+        if not embeds_data:
             logger.debug("⌛ [HANGAR] No Hangar Embeds To Process")
             return
 
@@ -191,32 +223,33 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         processed = 0
 
         # Update each tracked embed
-        for embed_data_raw in embed_ids:
+        for embed_data in embeds_data:
             try:
-                embed_data = json.loads(embed_data_raw)
-                channel_id = embed_data["channel_id"]
-                message_id = embed_data["message_id"]
+                channel_id = int(embed_data.channel_id)
+                message_id = int(embed_data.message_id)
 
-                # Get channel and message
-                channel = self.bot.get_channel(channel_id)
-                if not channel:
-                    channel = await self.bot.fetch_channel(channel_id)
+                message = await self.bot.get_message(message_id)
+                if not message:
+                    channel = await self.bot.get_channel(channel_id)
+                    if not channel:
+                        channel = await self.bot.fetch_channel(channel_id)
 
-                message = await channel.fetch_message(message_id)
+                    message = await channel.fetch_message(message_id)
+
                 await message.edit(embed=embed)
 
                 processed += 1
             except discord.NotFound:
-                logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_data_raw}")
+                logger.warning(f"⌛ [HANGAR] Hangar Embed Not Found: {embed_data.message_id}")
                 # Remove the missing embed from tracking
-                await self.redis.srem(f"{self._REDIS_PREFIX}:embeds", embed_data_raw)
+                await embed_data.delete()
             except Exception:
-                logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_data_raw}")
+                logger.exception(f"⌛ [HANGAR] Error Processing Hangar Embed: {embed_data.message_id}")
 
         next_light_change: datetime = state["next_light_change"]
 
         # Update task interval to run at the next light change time
-        self.process_hangar_embeds.change_interval(time=[next_light_change.time()])
+        self._process_hangar_embeds.change_interval(time=[next_light_change.time()])
         logger.debug(f"⌛ [HANGAR] Processing Hangar Embeds Rescheduled To: {dt_to_psx(next_light_change)}")
         logger.debug(f"⌛ [HANGAR] Processed {processed} Hangar Embeds")
 
@@ -241,7 +274,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
 
     @hangar.command(description="Create an embed to track the executive hangar status")
-    async def show(self, ctx: discord.ApplicationContext) -> None:
+    async def create(self, ctx: discord.ApplicationContext) -> None:
         """
         Send an embed that displays the current hangar status with a live updating timer.
 
@@ -260,50 +293,20 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             message = await ctx.followup.send(embed=embed)
 
             # Track this embed for updates
-            embed_data = {
-                "channel_id": ctx.channel.id,
-                "message_id": message.id,
-                "created_by": ctx.author.id,
-                "created_at": dt_to_psx(discord.utils.utcnow()),
-            }
+            embed_data = HangarEmbedData(
+                message_id=str(message.id),
+                channel_id=str(ctx.channel.id),
+                guild_id=str(ctx.guild.id),
+            )
+            await embed_data.insert()
 
-            await self.redis.sadd(f"{self._REDIS_PREFIX}:embeds", json.dumps(embed_data))
+            # Invalidate the cache
+            await self.redis.delete(f"{self._REDIS_PREFIX}:embeds")
+
             logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
         except Exception:
             logger.exception("[HANGAR] Error Creating Hangar Embed")
             await ctx.followup.send(embed=ErrorEmbed(description="Failed to create the hangar embed. Please try again."), ephemeral=True)
-
-    @hangar.command(description="Manually refresh the cycle data")
-    async def update(self, ctx: discord.ApplicationContext) -> None:
-        """
-        Manually trigger a refresh of the cycle data of all hangar status embeds.
-
-        Args:
-            ctx (discord.ApplicationContext): The application context
-        """
-
-        await ctx.defer(ephemeral=True)
-
-        try:
-            # Get tracked embeds count
-            embed_ids = await self.redis.smembers(f"{self._REDIS_PREFIX}:embeds")
-            embed_count = len(embed_ids)
-
-            if embed_count == 0:
-                await ctx.followup.send(embed=ErrorEmbed(None, "No hangar timers are currently being tracked."), ephemeral=True)
-                return
-
-            # Manually trigger the update task
-            await self.process_hangar_embeds()
-
-            await ctx.followup.send(
-                embed=SuccessEmbed(title="✅ Update Complete", description=f"Successfully updated {embed_count} hangar timer(s)."),
-                ephemeral=True,
-            )
-
-        except Exception:
-            logger.exception("[HANGAR] Error In Manual Update")
-            await ctx.followup.send(embed=ErrorEmbed(description="Failed to update hangar timers. Please try again."), ephemeral=True)
 
 
 def setup(bot: Qadir) -> None:
