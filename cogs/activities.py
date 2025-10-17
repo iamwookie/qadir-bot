@@ -5,7 +5,7 @@ import discord
 
 from config import config
 from core import Cog, Qadir
-from utils import dt_to_psx, psx_to_dt
+from models.activities import Activity, PartialActivity
 
 GUILD_IDS = config["activities"]["guilds"]
 
@@ -28,10 +28,11 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
     """
 
     REDIS_PREFIX: str = "qadir:activities"
-    LOCK_TIMEOUT: int = 3  # seconds
-    ACTIVITIES: list[str] = ["star_citizen"]
+    REDIS_LOCK_TTL: int = 3  # seconds
 
-    def __init__(self, bot: Qadir) -> None:
+    _ACTIVITIES: list[str] = ["star_citizen", "spotify"]
+
+    def init__(self, bot: Qadir) -> None:
         """
         Initialize the cog.
 
@@ -41,10 +42,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
-        # MongoDB collection wrapper
-        self.db = self.bot.db["activities"]
-
-    def act_to_id(self, activity_name: str) -> str:
+    def _act_to_id(self, activity_name: str) -> str:
         """
         Convert an activity name to its corresponding ID.
 
@@ -56,7 +54,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
 
         return activity_name.lower().replace(" ", "_")
 
-    async def pop_user_activity(self, user_id: int, activity_id: str) -> dict:
+    async def _pop_user_activity(self, user_id: int, activity_id: str) -> PartialActivity | None:
         """
         Pop (atomically) and return a user's tracked activity session data from Redis.
 
@@ -70,9 +68,9 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
 
         activity_key = f"{self.REDIS_PREFIX}:{str(user_id)}"
         session_data_raw = await self.redis.eval(R_POP_HASH_FIELD, keys=[activity_key], args=[activity_id])
-        return json.loads(session_data_raw) if session_data_raw else {}
+        return PartialActivity(**json.loads(session_data_raw)) if session_data_raw else None
 
-    async def handle_start_activity(self, member: discord.Member, activity_name: str) -> None:
+    async def _handle_start_activity(self, member: discord.Member, activity_name: str) -> None:
         """
         Handle when a user starts an activity.
 
@@ -81,12 +79,12 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
             activity_name (str): The name of the activity started
         """
 
-        activity_id = self.act_to_id(activity_name)
-        activity_data = {"start_time": str(dt_to_psx(discord.utils.utcnow()))}
-        await self.redis.hsetnx(f"{self.REDIS_PREFIX}:{str(member.id)}", activity_id, json.dumps(activity_data))
+        activity_id = self._act_to_id(activity_name)
+        activity_data = PartialActivity(user_id=str(member.id), activity=activity_id)
+        await self.redis.hsetnx(f"{self.REDIS_PREFIX}:{str(member.id)}", activity_id, json.dumps(activity_data.model_dump(), default=str))
         logger.debug(f"[ACTIVITIES] Tracked Activity: {member} -> {activity_id}")
 
-    async def handle_stop_activity(self, member: discord.Member, activity_name: str) -> None:
+    async def _handle_stop_activity(self, member: discord.Member, activity_name: str) -> None:
         """
         Handle when a user stops an activity.
 
@@ -95,27 +93,15 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
             activity_name (str): The name of the activity stopped
         """
 
-        activity_id = self.act_to_id(activity_name)
-        tracked = await self.pop_user_activity(member.id, activity_id)
+        activity_id = self._act_to_id(activity_name)
+        tracked = await self._pop_user_activity(member.id, activity_id)
         if not tracked:
             return  # Not tracking this activity
 
-        start_time = psx_to_dt(float(tracked["start_time"]))
-        end_time = discord.utils.utcnow()
-        duration = end_time - start_time
+        activity = Activity(user_id=str(member.id), activity=tracked.activity, start_time=tracked.start_time)
+        await activity.insert()
 
-        # Add the session to MongoDB
-        await self.db.insert_one(
-            {
-                "user_id": str(member.id),
-                "activity": activity_id,
-                "start_time": start_time,
-                "end_time": end_time,
-                "duration": duration.total_seconds(),
-            },
-        )
-
-        logger.debug(f"[ACTIVITIES] Saved Activity: {member} -> {activity_id}")
+        logger.debug(f"[ACTIVITIES] Saved Activity: {member} -> {activity.activity}")
 
     @discord.Cog.listener(name="on_presence_update")
     async def on_presence_update(self, before: discord.Member, after: discord.Member) -> None:
@@ -149,20 +135,20 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
 
         # Process each activity change with deduplication
         for activity_name in started_activities:
-            if self.act_to_id(activity_name) in self.ACTIVITIES:
-                lock_key = f"{self.REDIS_PREFIX}:lock:start:{str(after.id)}:{self.act_to_id(activity_name)}"
-                if await self.redis.set(lock_key, 1, nx=True, ex=self.LOCK_TIMEOUT):
+            if self._act_to_id(activity_name) in self._ACTIVITIES:
+                lock_key = f"{self.REDIS_PREFIX}:lock:start:{str(after.id)}:{self._act_to_id(activity_name)}"
+                if await self.redis.set(lock_key, 1, nx=True, ex=self.REDIS_LOCK_TTL):
                     try:
-                        await self.handle_start_activity(after, activity_name)
+                        await self._handle_start_activity(after, activity_name)
                     except Exception:
                         logger.exception("[ACTIVITIES] Error Handling Start Activity")
 
         for activity_name in stopped_activities:
-            if self.act_to_id(activity_name) in self.ACTIVITIES:
-                lock_key = f"{self.REDIS_PREFIX}:lock:stop:{str(after.id)}:{self.act_to_id(activity_name)}"
-                if await self.redis.set(lock_key, 1, nx=True, ex=self.LOCK_TIMEOUT):
+            if self._act_to_id(activity_name) in self._ACTIVITIES:
+                lock_key = f"{self.REDIS_PREFIX}:lock:stop:{str(after.id)}:{self._act_to_id(activity_name)}"
+                if await self.redis.set(lock_key, 1, nx=True, ex=self.REDIS_LOCK_TTL):
                     try:
-                        await self.handle_stop_activity(after, activity_name)
+                        await self._handle_stop_activity(after, activity_name)
                     except Exception:
                         logger.exception("[ACTIVITIES] Error Handling Stop Activity")
 
