@@ -18,3 +18,4 @@ repos:
     hooks:
       - id: ruff
         language_version: python3
+        args: ["--fix"] # Fix any issues
