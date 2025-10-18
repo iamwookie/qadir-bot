@@ -224,17 +224,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         # Update each tracked embed
         for embed_item in embed_items:
             try:
-                channel_id = int(embed_item.channel_id)
                 message_id = int(embed_item.message_id)
+                channel_id = int(embed_item.channel_id)
 
-                message = self.bot.get_message(message_id)
-                if not message:
-                    channel = self.bot.get_channel(channel_id)
-                    if not channel:
-                        channel = await self.bot.fetch_channel(channel_id)
-
-                    message = await channel.fetch_message(message_id)
-
+                message = await self.bot.get_or_fetch_message(message_id, channel_id)
                 await message.edit(embed=embed)
 
                 processed += 1

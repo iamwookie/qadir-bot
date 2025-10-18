@@ -23,7 +23,7 @@ class CreateProposalModal(discord.ui.Modal):
     """Modal for creating a proposal."""
 
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(title="Create a Proposal", *args, **kwargs)
 
         self.add_item(discord.ui.InputText(label="Title", max_length=64, style=discord.InputTextStyle.short, required=True))
         self.add_item(discord.ui.InputText(label="Summary", max_length=2048, style=discord.InputTextStyle.long, required=True))
