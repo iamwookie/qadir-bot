@@ -186,7 +186,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
             ctx (discord.ApplicationContext): The application context
         """
 
-        modal = CreateProposalModal(self, title="Create a Proposal")
+        modal = CreateProposalModal()
         await ctx.send_modal(modal)
 
 
