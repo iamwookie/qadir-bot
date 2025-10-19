@@ -5,9 +5,10 @@ import discord
 
 from config import config
 from core import Cog, Qadir
-from models.activities import Activity, PartialActivity
+from models.activity import Activity, PartialActivity
 
-GUILD_IDS = config["activities"]["guilds"]
+GUILD_IDS = config["activity"]["guilds"]
+ACTIVITIES = config["activity"]["activities"]
 
 # Atomically pop a field from a Redis hash and return its value
 # NOTE: Can be moved to core/scripts.py if needed elsewhere
@@ -22,15 +23,13 @@ R_POP_HASH_FIELD = """
 logger = logging.getLogger("qadir")
 
 
-class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
+class ActivityCog(Cog, name="Activity", guild_ids=GUILD_IDS):
     """
     A cog to manage executive track user presence activity.
     """
 
-    REDIS_PREFIX: str = "qadir:activities"
+    REDIS_PREFIX: str = "qadir:activity"
     REDIS_LOCK_TTL: int = 3  # seconds
-
-    _ACTIVITIES: list[str] = ["star_citizen", "spotify"]
 
     def init__(self, bot: Qadir) -> None:
         """
@@ -82,7 +81,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
         activity_id = self._act_to_id(activity_name)
         activity_data = PartialActivity(user_id=str(member.id), activity=activity_id)
         await self.redis.hsetnx(f"{self.REDIS_PREFIX}:{str(member.id)}", activity_id, json.dumps(activity_data.model_dump(), default=str))
-        logger.debug(f"[ACTIVITIES] Tracked Activity: {member} -> {activity_id}")
+        logger.debug(f"[ACTIVITY] Tracked Activity: {member} -> {activity_id}")
 
     async def _handle_stop_activity(self, member: discord.Member, activity_name: str) -> None:
         """
@@ -101,7 +100,7 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
         activity = Activity(user_id=str(member.id), activity=tracked.activity, start_time=tracked.start_time)
         await activity.insert()
 
-        logger.debug(f"[ACTIVITIES] Saved Activity: {member} -> {activity.activity}")
+        logger.debug(f"[ACTIVITY] Saved Activity: {member} -> {activity.activity}")
 
     @discord.Cog.listener(name="on_presence_update")
     async def on_presence_update(self, before: discord.Member, after: discord.Member) -> None:
@@ -135,30 +134,30 @@ class ActivitiesCog(Cog, name="Activities", guild_ids=GUILD_IDS):
 
         # Process each activity change with deduplication
         for activity_name in started_activities:
-            if self._act_to_id(activity_name) in self._ACTIVITIES:
+            if self._act_to_id(activity_name) in ACTIVITIES:
                 lock_key = f"{self.REDIS_PREFIX}:lock:start:{str(after.id)}:{self._act_to_id(activity_name)}"
                 if await self.redis.set(lock_key, 1, nx=True, ex=self.REDIS_LOCK_TTL):
                     try:
                         await self._handle_start_activity(after, activity_name)
                     except Exception:
-                        logger.exception("[ACTIVITIES] Error Handling Start Activity")
+                        logger.exception("[ACTIVITY] Error Handling Start Activity")
 
         for activity_name in stopped_activities:
-            if self._act_to_id(activity_name) in self._ACTIVITIES:
+            if self._act_to_id(activity_name) in ACTIVITIES:
                 lock_key = f"{self.REDIS_PREFIX}:lock:stop:{str(after.id)}:{self._act_to_id(activity_name)}"
                 if await self.redis.set(lock_key, 1, nx=True, ex=self.REDIS_LOCK_TTL):
                     try:
                         await self._handle_stop_activity(after, activity_name)
                     except Exception:
-                        logger.exception("[ACTIVITIES] Error Handling Stop Activity")
+                        logger.exception("[ACTIVITY] Error Handling Stop Activity")
 
 
 def setup(bot: Qadir) -> None:
     """
-    Load the ActivitiesCog into the bot.
+    Load the ActivityCog into the bot.
 
     Args:
         bot (Qadir): The bot instance to load the cog into
     """
 
-    bot.add_cog(ActivitiesCog(bot))
+    bot.add_cog(ActivityCog(bot))

@@ -62,12 +62,12 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
         Posts results and locks threads.
         """
 
-        logger.debug("⌛ [PROPOSALS] [0] Processing Proposals...")
+        logger.debug("⌛🔄 [PROPOSALS] [0] Processing Proposals...")
 
         proposals = await Proposal.find(Proposal.status == ProposalStatus.ACTIVE).to_list()
 
         if not proposals:
-            logger.debug("⌛ [PROPOSALS] [0] No Proposals To Process")
+            logger.debug("⌛✅️ [PROPOSALS] [0] No Proposals To Process")
             return
 
         processed = 0
@@ -99,11 +99,11 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
             except (discord.NotFound, discord.Forbidden):
                 # Thread or message no longer exists, clean up MongoDB
                 await proposal.delete()
-                logger.warning(f"⌛ [PROPOSALS] [0] Cleaned Up Non-Existent Proposal: {proposal.thread_id}")
+                logger.warning(f"⌛⚠️ [PROPOSALS] [0] Cleaned Up Non-Existent Proposal: {proposal.thread_id}")
             except Exception:
-                logger.exception(f"⌛ [PROPOSALS] [0] Error Processing Proposal: {proposal.thread_id}")
+                logger.exception(f"⌛❌ [PROPOSALS] [0] Error Processing Proposal: {proposal.thread_id}")
 
-        logger.debug(f"⌛ [PROPOSALS] [0] Processed {processed} Proposals")
+        logger.debug(f"⌛✅️ [PROPOSALS] [0] Processed {processed} Proposals")
 
     @_process_proposals.before_loop
     async def before_process_proposals(self) -> None:
@@ -120,19 +120,19 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
             error (Exception): The raised exception
         """
 
-        logger.error("⌛ [PROPOSALS] Error Processing Proposals", exc_info=error)
+        logger.error("⌛❌ [PROPOSALS] Error Processing Proposals", exc_info=error)
 
     @tasks.loop(count=1)
     async def _restore_voting_views(self) -> None:
         """Restore voting views from MongoDB on bot startup."""
 
-        logger.debug("⌛ [PROPOSALS] [1] Restoring Voting Views...")
+        logger.debug("⌛🔄 [PROPOSALS] [1] Restoring Voting Views...")
 
         # Get all active proposals from MongoDB
         proposals = await Proposal.find(Proposal.status == ProposalStatus.ACTIVE).to_list()
 
         if not proposals:
-            logger.debug("⌛ [PROPOSALS] [1] No Voting Views To Restore")
+            logger.debug("⌛✅️ [PROPOSALS] [1] No Voting Views To Restore")
             return
 
         restored = 0
@@ -154,11 +154,11 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
                 restored += 1
             except (discord.NotFound, discord.Forbidden):
-                logger.warning(f"⌛ [PROPOSALS] [1] Proposal Not Found: {proposal.thread_id}")
+                logger.warning(f"⌛⚠️ [PROPOSALS] [1] Proposal Not Found: {proposal.thread_id}")
             except Exception:
-                logger.exception(f"⌛ [PROPOSALS] [1] Error Restoring View For Proposal: {proposal.thread_id}")
+                logger.exception(f"⌛❌ [PROPOSALS] [1] Error Restoring View For Proposal: {proposal.thread_id}")
 
-        logger.debug(f"⌛ [PROPOSALS] [1] Restored {restored} Voting Views")
+        logger.debug(f"⌛✅️ [PROPOSALS] [1] Restored {restored} Voting Views")
 
     @_restore_voting_views.before_loop
     async def before_restore_voting_views(self) -> None:
@@ -175,7 +175,7 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
             error (Exception): The raised exception
         """
 
-        logger.error("⌛ [PROPOSALS] [1] Error Restoring Voting Views", exc_info=error)
+        logger.error("⌛❌ [PROPOSALS] [1] Error Restoring Voting Views", exc_info=error)
 
     @discord.slash_command(description="Submit a proposal")
     async def propose(self, ctx: discord.ApplicationContext) -> None:

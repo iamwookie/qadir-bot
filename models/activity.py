@@ -14,7 +14,7 @@ class PartialActivity(BaseModel):
 
 
 class Activity(Document):
-    """Beanie document model for activities."""
+    """Beanie document model for activity data."""
 
     user_id: str
     activity: str
@@ -27,4 +27,4 @@ class Activity(Document):
         self.duration = (self.end_time - self.start_time).total_seconds()
 
     class Settings:
-        name = "activities"
+        name = "activity_data"
