@@ -15,7 +15,7 @@ class Votes(BaseModel):
 
 
 class Proposal(Document):
-    """Beanie document model for proposals."""
+    """Beanie document model for proposals data."""
 
     thread_id: str
     message_id: str
