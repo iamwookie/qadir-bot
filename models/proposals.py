@@ -15,7 +15,7 @@ class Votes(BaseModel):
 
 
 class Proposal(Document):
-    """Beanie document model for proposals data."""
+    """Beanie document model for proposal data."""
 
     thread_id: str
     message_id: str
@@ -25,7 +25,7 @@ class Proposal(Document):
     votes: Votes = Field(default_factory=Votes)
 
     class Settings:
-        name = "proposals"
+        name = "proposals_data"
         indexes = [
             "thread_id",
             "created_at",

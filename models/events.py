@@ -37,7 +37,7 @@ class Event(Document):
     loot_entries: list[LootEntry] = Field(default_factory=list)
 
     class Settings:
-        name = "events"
+        name = "events_data"
         indexes = [
             "thread_id",
             "creator_id",
