@@ -8,14 +8,14 @@ from utils.enums import EventStatus
 
 
 class LootItem(BaseModel):
-    """Embedded document for storing loot items in an event."""
+    """Embedded document for storing loot items in event data."""
 
     id: str
     name: str
 
 
 class LootEntry(BaseModel):
-    """Embedded document for storing loot entries in an event."""
+    """Embedded document for storing loot entries in event data."""
 
     item: LootItem
     quantity: int
@@ -24,7 +24,7 @@ class LootEntry(BaseModel):
 
 
 class Event(Document):
-    """Beanie document model for events."""
+    """Beanie document model for event data."""
 
     thread_id: str
     message_id: str
@@ -37,7 +37,7 @@ class Event(Document):
     loot_entries: list[LootEntry] = Field(default_factory=list)
 
     class Settings:
-        name = "events"
+        name = "events_data"
         indexes = [
             "thread_id",
             "creator_id",

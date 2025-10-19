@@ -208,12 +208,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     async def _process_hangar_embeds(self):
         """Update all tracked hangar embeds dynamically or every minute."""
 
-        logger.debug("⌛ [HANGAR] [0] Processing Hangar Embeds...")
+        logger.debug("⌛🔄 [HANGAR] [0] Processing Hangar Embeds...")
 
         # Get all tracked embed message IDs
         embed_items = await HangarEmbedItem.find_all().to_list()
         if not embed_items:
-            logger.debug("⌛ [HANGAR] [0] No Hangar Embeds To Process")
+            logger.debug("⌛✅ [HANGAR] [0] No Hangar Embeds To Process")
             return
 
         # Calculate current state and create the HangarEmbed
@@ -232,18 +232,18 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
                 processed += 1
             except discord.NotFound:
-                logger.warning(f"⌛ [HANGAR] [0] Hangar Embed Not Found: {embed_item.message_id}")
+                logger.warning(f"⌛⚠️ [HANGAR] [0] Cleaned Up Non-Existent Hangar Embed: {embed_item.message_id}")
                 # Remove the missing embed from tracking
                 await embed_item.delete()
             except Exception:
-                logger.exception(f"⌛ [HANGAR] [0] Error Processing Hangar Embed: {embed_item.message_id}")
+                logger.exception(f"⌛❌ [HANGAR] [0] Error Processing Hangar Embed: {embed_item.message_id}")
 
         next_light_change: datetime = state["next_light_change"]
 
         # Update task interval to run at the next light change time
         self._process_hangar_embeds.change_interval(time=[next_light_change.time()])
-        logger.debug(f"⌛ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {next_light_change} UTC")
-        logger.debug(f"⌛ [HANGAR] [0] Processed {processed} Hangar Embeds")
+        logger.debug(f"⌛✅️ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {next_light_change} UTC")
+        logger.debug(f"⌛✅️ [HANGAR] [0] Processed {processed} Hangar Embeds")
 
     @_process_hangar_embeds.before_loop
     async def before_process_hangar_embeds(self):
@@ -260,7 +260,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             error (Exception): The raised exception
         """
 
-        logger.error("⌛ [HANGAR] [0] Error Processing Hangar Embeds", exc_info=error)
+        logger.error("⌛❌ [HANGAR] [0] Error Processing Hangar Embeds", exc_info=error)
 
     # Hangar command group
     hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
