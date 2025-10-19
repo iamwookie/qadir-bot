@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 import discord
 
@@ -8,7 +9,7 @@ from core import Cog, Qadir
 from models.activity import Activity, PartialActivity
 
 GUILD_IDS = config["activity"]["guilds"]
-ACTIVITIES = config["activity"]["activities"]
+APPLICATIONS = config["activity"]["applications"]
 
 # Atomically pop a field from a Redis hash and return its value
 # NOTE: Can be moved to core/scripts.py if needed elsewhere
@@ -29,17 +30,7 @@ class ActivityCog(Cog, name="Activity", guild_ids=GUILD_IDS):
     """
 
     REDIS_PREFIX: str = "qadir:activity"
-    REDIS_LOCK_TTL: int = 3  # seconds
-
-    def init__(self, bot: Qadir) -> None:
-        """
-        Initialize the cog.
-
-        Args:
-            bot (Qadir): The bot instance to load the cog into
-        """
-
-        super().__init__(bot)
+    REDIS_LOCK_TTL: int = 5  # seconds
 
     def _act_to_id(self, activity_name: str) -> str:
         """
@@ -53,23 +44,38 @@ class ActivityCog(Cog, name="Activity", guild_ids=GUILD_IDS):
 
         return activity_name.lower().replace(" ", "_")
 
-    async def _pop_user_activity(self, user_id: int, activity_id: str) -> PartialActivity | None:
+    def _lock_key(self, action: str, user_id: int, application_id: int) -> str:
+        """
+        Generate a Redis lock key for activity actions.
+
+        Args:
+            action (str): The action being performed (start/stop)
+            user_id (int): The user ID
+            application_id (int): The application ID
+
+        Returns:
+            str: The generated lock key
+        """
+
+        return f"{self.REDIS_PREFIX}:lock:{action}:{str(user_id)}:{str(application_id)}"
+
+    async def _pop_user_activity(self, user_id: int, application_id: int) -> PartialActivity | None:
         """
         Pop (atomically) and return a user's tracked activity session data from Redis.
 
         Args:
             user_id (int): The user ID to get sessions for
-            activity_id (str): The activity ID to pop
+            application_id (int): The application ID to pop
 
         Returns:
             dict: The popped activity session data, or empty dict if none found
         """
 
         activity_key = f"{self.REDIS_PREFIX}:{str(user_id)}"
-        session_data_raw = await self.redis.eval(R_POP_HASH_FIELD, keys=[activity_key], args=[activity_id])
+        session_data_raw = await self.redis.eval(R_POP_HASH_FIELD, keys=[activity_key], args=[str(application_id)])
         return PartialActivity(**json.loads(session_data_raw)) if session_data_raw else None
 
-    async def _handle_start_activity(self, member: discord.Member, activity_name: str) -> None:
+    async def _handle_start_activity(self, member: discord.Member, activity: discord.Activity) -> None:
         """
         Handle when a user starts an activity.
 
@@ -78,12 +84,24 @@ class ActivityCog(Cog, name="Activity", guild_ids=GUILD_IDS):
             activity_name (str): The name of the activity started
         """
 
-        activity_id = self._act_to_id(activity_name)
-        activity_data = PartialActivity(user_id=str(member.id), activity=activity_id)
-        await self.redis.hsetnx(f"{self.REDIS_PREFIX}:{str(member.id)}", activity_id, json.dumps(activity_data.model_dump(), default=str))
-        logger.debug(f"[ACTIVITY] Tracked Activity: {member} -> {activity_id}")
+        app_id = activity.application_id
 
-    async def _handle_stop_activity(self, member: discord.Member, activity_name: str) -> None:
+        if not await self.redis.set(self._lock_key("start", member.id, app_id), 1, nx=True, ex=self.REDIS_LOCK_TTL):
+            return  # Another start event is being processed
+
+        start_time: datetime | None = activity.timestamps.get("start") or activity.created_at
+
+        payload = PartialActivity(
+            user_id=str(member.id),
+            application_id=str(app_id),
+            name=activity.name,
+            start_time=start_time,
+        )
+        await self.redis.hsetnx(f"{self.REDIS_PREFIX}:{str(member.id)}", str(app_id), json.dumps(payload.model_dump(), default=str))
+
+        logger.debug(f"[ACTIVITY] Tracked Activity: {member} -> {activity.application_id}")
+
+    async def _handle_stop_activity(self, member: discord.Member, activity: discord.Activity) -> None:
         """
         Handle when a user stops an activity.
 
@@ -92,15 +110,19 @@ class ActivityCog(Cog, name="Activity", guild_ids=GUILD_IDS):
             activity_name (str): The name of the activity stopped
         """
 
-        activity_id = self._act_to_id(activity_name)
-        tracked = await self._pop_user_activity(member.id, activity_id)
+        app_id = activity.application_id
+
+        if not await self.redis.set(self._lock_key("stop", member.id, app_id), 1, nx=True, ex=self.REDIS_LOCK_TTL):
+            return  # Another stop event is being processed
+
+        tracked = await self._pop_user_activity(member.id, app_id)
         if not tracked:
             return  # Not tracking this activity
 
-        activity = Activity(user_id=str(member.id), activity=tracked.activity, start_time=tracked.start_time)
-        await activity.insert()
+        payload = Activity(user_id=str(member.id), application_id=str(app_id), name=tracked.name, start_time=tracked.start_time)
+        await payload.insert()
 
-        logger.debug(f"[ACTIVITY] Saved Activity: {member} -> {activity.activity}")
+        logger.debug(f"[ACTIVITY] Saved Activity: {member} -> {payload.application_id}")
 
     @discord.Cog.listener(name="on_presence_update")
     async def on_presence_update(self, before: discord.Member, after: discord.Member) -> None:
@@ -119,37 +141,32 @@ class ActivityCog(Cog, name="Activity", guild_ids=GUILD_IDS):
         if after.guild.id not in GUILD_IDS:
             return
 
-        # Get activities before and after
-        after_activities: set[str] = set()
-        before_activities: set[str] = set()
+        # Sort activities by application_id for easy comparison
+        after_activities: dict[int, discord.Activity] = {
+            a.application_id: a for a in after.activities if getattr(a, "application_id", None)
+        }
+        before_activities: dict[int, discord.Activity] = {
+            a.application_id: a for a in before.activities if getattr(a, "application_id", None)
+        }
 
-        if after.activities:
-            after_activities = {activity.name for activity in after.activities if hasattr(activity, "name")}
-
-        if before.activities:
-            before_activities = {activity.name for activity in before.activities if hasattr(activity, "name")}
-
-        started_activities = after_activities - before_activities
-        stopped_activities = before_activities - after_activities
+        # Determine started and stopped activities
+        started_activities = [after_activities[i] for i in set(after_activities) - set(before_activities)]
+        stopped_activities = [before_activities[i] for i in set(before_activities) - set(after_activities)]
 
         # Process each activity change with deduplication
-        for activity_name in started_activities:
-            if self._act_to_id(activity_name) in ACTIVITIES:
-                lock_key = f"{self.REDIS_PREFIX}:lock:start:{str(after.id)}:{self._act_to_id(activity_name)}"
-                if await self.redis.set(lock_key, 1, nx=True, ex=self.REDIS_LOCK_TTL):
-                    try:
-                        await self._handle_start_activity(after, activity_name)
-                    except Exception:
-                        logger.exception("[ACTIVITY] Error Handling Start Activity")
+        for activity in started_activities:
+            if activity.application_id in APPLICATIONS:
+                try:
+                    await self._handle_start_activity(after, activity)
+                except Exception:
+                    logger.exception("[ACTIVITY] Error Handling Start Activity")
 
-        for activity_name in stopped_activities:
-            if self._act_to_id(activity_name) in ACTIVITIES:
-                lock_key = f"{self.REDIS_PREFIX}:lock:stop:{str(after.id)}:{self._act_to_id(activity_name)}"
-                if await self.redis.set(lock_key, 1, nx=True, ex=self.REDIS_LOCK_TTL):
-                    try:
-                        await self._handle_stop_activity(after, activity_name)
-                    except Exception:
-                        logger.exception("[ACTIVITY] Error Handling Stop Activity")
+        for activity in stopped_activities:
+            if activity.application_id in APPLICATIONS:
+                try:
+                    await self._handle_stop_activity(after, activity)
+                except Exception:
+                    logger.exception("[ACTIVITY] Error Handling Stop Activity")
 
 
 def setup(bot: Qadir) -> None:
