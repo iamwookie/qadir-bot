@@ -9,7 +9,8 @@ class PartialActivity(BaseModel):
     """Embedded document for storing partial activity data."""
 
     user_id: str
-    activity: str
+    application_id: str
+    name: str
     start_time: datetime = Field(default_factory=discord.utils.utcnow)
 
 
@@ -17,7 +18,8 @@ class Activity(Document):
     """Beanie document model for activity data."""
 
     user_id: str
-    activity: str
+    application_id: str
+    name: str
     start_time: datetime
     end_time: datetime = Field(default_factory=discord.utils.utcnow)
     duration: float = 0.0

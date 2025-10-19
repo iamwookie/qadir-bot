@@ -1,6 +1,6 @@
 [app]
 name = "Qadir DEV"
-version = "3.0.1"
+version = "3.0.2"
 debug = false
 
 [proposals]
@@ -10,7 +10,7 @@ roles = [1365424506507890771]
 
 [activity]
 guilds = [1121743509372805122, 1217554572554408118]
-activities = ["star_citizen"]
+applications = [452295596917784577]
 
 [events]
 guilds = [1121743509372805122, 1217554572554408118]

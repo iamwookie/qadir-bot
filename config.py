@@ -27,7 +27,7 @@ class ProposalsConfig(TypedDict):
 
 class ActivityConfig(TypedDict):
     guilds: list[int]
-    activities: list[str]
+    applications: list[int]
 
 
 class EventsConfig(TypedDict):
