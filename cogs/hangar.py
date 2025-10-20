@@ -227,7 +227,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 message_id = int(embed_item.message_id)
                 channel_id = int(embed_item.channel_id)
 
-                message = await self.bot.get_or_fetch_message(message_id, channel_id)
+                channel = self.bot.get_partial_messageable(channel_id)
+                message = channel.get_partial_message(message_id)
                 await message.edit(embed=embed)
 
                 processed += 1
@@ -312,7 +313,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             )
         )
 
-        logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
+        logger.debug(f"[HANGAR] Created Hangar Timer Embed: {message.id}")
 
 
 def setup(bot: Qadir) -> None:
