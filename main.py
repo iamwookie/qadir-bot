@@ -11,14 +11,22 @@ if __name__ == "__main__":
     logger.propagate = False
     logger.setLevel(logging.DEBUG if config["app"]["debug"] else logging.INFO)
 
+    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
+
     stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
+    stream_handler.formatter = formatter
 
     file_handler = logging.FileHandler(filename="qadir.log", encoding="utf-8", mode="w")
-    file_handler.formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
+    file_handler.formatter = formatter
+    file_handler.setLevel(logging.DEBUG)
 
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.WARNING)
+    root_logger.addHandler(stream_handler)
+    root_logger.addHandler(file_handler)
 
     # Enable default intents and add privileged intents
     intents = Intents.default()
