@@ -6,6 +6,7 @@ from discord import Intents
 from config import DISCORD_TOKEN, config
 from core import Qadir
 
+
 if __name__ == "__main__":
     logger = logging.getLogger("qadir")
     logger.propagate = False
