@@ -56,7 +56,7 @@ class Qadir(discord.Bot):
         if not self._initialised.is_set():
             self._initialised.set()
 
-        logger.info(f"✅ Initialised: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
+        logger.info(f"✅ Initialised: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
 
     async def get_or_fetch_message(self, message_id: int, channel_id: int) -> discord.Message | None:
         """
