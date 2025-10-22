@@ -42,13 +42,13 @@ class HangarEmbed(discord.Embed):
         if state["status"] == "Hangar Closed":
             self.add_field(
                 name="ℹ️ Offline Phase",
-                value="Executive hangars are currently offline. LED progression indicates time until reopening.",
+                value="Executive hangars are `OFFLINE`, LED progression indicates time until reopening",
                 inline=False,
             )
         elif state["status"] == "Hangar Open":
             self.add_field(
                 name="ℹ️ Online Phase",
-                value="Executive hangars are operational! LED progression shows time remaining until closure.",
+                value="Executive hangars are `OPERATIONAL`, LED progression indicates time until closure",
                 inline=False,
             )
 
