@@ -56,10 +56,10 @@ class VotingView(discord.ui.View):
         # Toggle upvote
         if str(user_id) in self.proposal.votes.upvotes:
             self.proposal.votes.upvotes.remove(str(user_id))
-            action = "removed your upvote for this proposal. 🚫"
+            action = "removed your upvote for this proposal 🚫"
         else:
             self.proposal.votes.upvotes.append(str(user_id))
-            action = "upvoted this proposal. 👍"
+            action = "upvoted this proposal 👍"
 
         # Update Redis with new vote data
         await self.proposal.replace()
@@ -86,10 +86,10 @@ class VotingView(discord.ui.View):
         # Toggle downvote
         if str(user_id) in self.proposal.votes.downvotes:
             self.proposal.votes.downvotes.remove(str(user_id))
-            action = "removed your downvote for this proposal. 🚫"
+            action = "removed your downvote for this proposal 🚫"
         else:
             self.proposal.votes.downvotes.append(str(user_id))
-            action = "downvoted this proposal. 👎"
+            action = "downvoted this proposal 👎"
 
         # Update Redis with new vote data
         await self.proposal.replace()

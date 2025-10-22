@@ -97,5 +97,5 @@ class AddLootModal(discord.ui.Modal):
         # Update the event card with new loot
         await self.cog.update_event_card(self.event)
 
-        embed = SuccessEmbed(title="Loot Added", description=f"Added **{quantity}x {selected_item.name}** to the event loot!")
+        embed = SuccessEmbed(title="Loot Added", description=f"Added `{quantity}x {selected_item.name}` to the event loot")
         await interaction.followup.send(embed=embed, ephemeral=True)
