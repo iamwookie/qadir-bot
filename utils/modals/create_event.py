@@ -92,7 +92,7 @@ class CreateEventModal(discord.ui.Modal):
 
         embed = SuccessEmbed(
             title="Event Created",
-            description=f"""**{event_name}** has been created in {thread.mention}.
-            You've been automatically added as a participant.""",
+            description=f"""**{event_name}** has been created in {thread.mention}
+            You've been automatically added as a participant""",
         )
         await interaction.followup.send(embed=embed, ephemeral=True)

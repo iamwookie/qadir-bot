@@ -24,12 +24,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     _REDIS_PREFIX: str = "qadir:hangar"
     _REDIS_TTL: int = 3600  # seconds
 
-    _OPEN_DURATION: int = 3900385  # milliseconds
-    _CLOSE_DURATION: int = 7200711  # milliseconds
+    _OPEN_DURATION: int = 3900381  # milliseconds
+    _CLOSE_DURATION: int = 7200704  # milliseconds
     _CYCLE_DURATION: int = _OPEN_DURATION + _CLOSE_DURATION
 
-    # Original Timestamp: 2025-09-21T00:04:27.222-04:00 (EDT, UTC-4)
-    _INITIAL_OPEN_TIME: datetime = datetime(2025, 9, 21, 0, 4, 27, 222000, timezone(timedelta(hours=-4))).astimezone(timezone.utc)
+    # Original Timestamp: 2025-10-16T13:43:24.402-04:00 (EDT, UTC-4)
+    _INITIAL_OPEN_TIME: datetime = datetime(2025, 10, 16, 13, 43, 24, 402000, timezone(timedelta(hours=-4))).astimezone(timezone.utc)
 
     # Define the hangar lights thresholds
     _THRESHOLDS: list[dict] = [
@@ -311,7 +311,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         await ctx.followup.send(
             embed=SuccessEmbed(
                 title="Embed Created",
-                description="I've created a hangar status embed in this channel and will update it automatically.",
+                description="I've created a hangar status embed in this channel and will update it automatically",
             )
         )
 

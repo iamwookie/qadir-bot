@@ -72,7 +72,7 @@ class CreateProposalModal(discord.ui.Modal):
         )
         await proposal.insert()
 
-        embed = SuccessEmbed(title="Proposal Created", description=f"Your proposal has been created in {thread.mention}.")
+        embed = SuccessEmbed(title="Proposal Created", description=f"Your proposal has been created in {thread.mention}")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
         logger.info(f"✅ [PROPOSALS] Proposal Created: {proposal.thread_id} ({title})")

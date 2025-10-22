@@ -162,10 +162,10 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
                     embed = SuccessEmbed(
                         title="Joined Event",
                         description=(
-                            f"I have added you to **{event.name}**.\n\n"
+                            f"I have added you to **{event.name}**\n\n"
                             f"**You can now:**\n"
-                            f"• Use `/event loot` in this thread to add items.\n"
-                            f"• Check the event card above for current totals."
+                            f"• Use `/event loot` in this thread to add items\n"
+                            f"• Check the event card above for current totals"
                         ),
                     )
                     await ctx.followup.send(embed=embed, ephemeral=True)
@@ -349,7 +349,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
-        embed = SuccessEmbed(title="Your Events", description="A summary of the events you've created.")
+        embed = SuccessEmbed(title="Your Events", description="A summary of the events you've created:")
 
         created_text: list[str] = []
         for event in events:
