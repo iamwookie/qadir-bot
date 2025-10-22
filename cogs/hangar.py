@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -217,8 +218,6 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             return
 
         # Calculate current state and create the HangarEmbed
-        state = self._calculate_hangar_state()
-        embed = HangarEmbed(state)
         processed = 0
 
         # Update each tracked embed
@@ -229,9 +228,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
                 channel = self.bot.get_partial_messageable(channel_id)
                 message = channel.get_partial_message(message_id)
+                embed = HangarEmbed(self._calculate_hangar_state())
                 await message.edit(embed=embed)
 
                 processed += 1
+
+                await asyncio.sleep(1)  # To avoid hitting rate limits
             except discord.NotFound:
                 logger.warning(f"⌛⚠️ [HANGAR] [0] Cleaned Up Non-Existent Hangar Embed: {embed_item.message_id}")
                 # Remove the missing embed from tracking
@@ -239,10 +241,10 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             except Exception:
                 logger.exception(f"⌛❌ [HANGAR] [0] Error Processing Hangar Embed: {embed_item.message_id}")
 
-        next_light_change: datetime = state["next_light_change"]
-
-        # Update task interval to run at the next light change time
+        new_state = self._calculate_hangar_state()  # Recalculate in case of rate limits
+        next_light_change: datetime = new_state["next_light_change"]
         self._process_hangar_embeds.change_interval(time=[next_light_change.time()])
+
         logger.debug(f"⌛✅️ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {next_light_change} UTC")
         logger.debug(f"⌛✅️ [HANGAR] [0] Processed {processed} Hangar Embeds")
 
