@@ -50,13 +50,13 @@ class EventSelect(discord.ui.Select):
 
         event = await self.cog.get_or_fetch_event_by_id(selected_thread_id)
         if not event:
-            embed = ErrorEmbed(title="Event Not Found", description="The event you are trying to join does not exist.")
+            embed = ErrorEmbed(title="Event Not Found", description="The event you are trying to join does not exist")
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
         # Check if user is already a participant
         if str(interaction.user.id) in event.participants:
-            embed = SuccessEmbed(title="Already Participating", description="You're already participating in this event.")
+            embed = SuccessEmbed(title="Already Participating", description="You're already participating in this event")
             await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
@@ -74,5 +74,5 @@ class EventSelect(discord.ui.Select):
         # Update the event card with new participant
         await self.cog.update_event_card(event)
 
-        embed = SuccessEmbed(title="Joined Event", description=f"You have successfully joined **{event.name}**.")
+        embed = SuccessEmbed(title="Joined Event", description=f"You have successfully joined **{event.name}**")
         await interaction.followup.send(embed=embed, ephemeral=True)

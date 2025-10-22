@@ -1,3 +1,30 @@
+"""
+PYAM Executive Hangar Status Tracker
+
+MIT License
+
+Copyright (c) 2025 Xyxyll
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -23,12 +50,12 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     _REDIS_PREFIX: str = "qadir:hangar"
     _REDIS_TTL: int = 3600  # seconds
 
-    _OPEN_DURATION: int = 3900385  # milliseconds
-    _CLOSE_DURATION: int = 7200711  # milliseconds
+    _OPEN_DURATION: int = 3900381  # milliseconds
+    _CLOSE_DURATION: int = 7200704  # milliseconds
     _CYCLE_DURATION: int = _OPEN_DURATION + _CLOSE_DURATION
 
-    # Original Timestamp: 2025-09-21T00:04:27.222-04:00 (EDT, UTC-4)
-    _INITIAL_OPEN_TIME: datetime = datetime(2025, 9, 21, 0, 4, 27, 222000, timezone(timedelta(hours=-4))).astimezone(timezone.utc)
+    # Original Timestamp: 2025-10-16T13:43:24.402-04:00 (EDT, UTC-4)
+    _INITIAL_OPEN_TIME: datetime = datetime(2025, 10, 16, 13, 43, 24, 402000, timezone(timedelta(hours=-4))).astimezone(timezone.utc)
 
     # Define the hangar lights thresholds
     _THRESHOLDS: list[dict] = [
@@ -208,17 +235,15 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     async def _process_hangar_embeds(self):
         """Update all tracked hangar embeds dynamically or every minute."""
 
-        logger.debug("⌛ [HANGAR] [0] Processing Hangar Embeds...")
+        logger.debug("⌛🔄 [HANGAR] [0] Processing Hangar Embeds...")
 
         # Get all tracked embed message IDs
         embed_items = await HangarEmbedItem.find_all().to_list()
         if not embed_items:
-            logger.debug("⌛ [HANGAR] [0] No Hangar Embeds To Process")
+            logger.debug("⌛✅ [HANGAR] [0] No Hangar Embeds To Process")
             return
 
         # Calculate current state and create the HangarEmbed
-        state = self._calculate_hangar_state()
-        embed = HangarEmbed(state)
         processed = 0
 
         # Update each tracked embed
@@ -227,23 +252,27 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 message_id = int(embed_item.message_id)
                 channel_id = int(embed_item.channel_id)
 
-                message = await self.bot.get_or_fetch_message(message_id, channel_id)
+                channel = self.bot.get_partial_messageable(channel_id)
+                message = channel.get_partial_message(message_id)
+                embed = HangarEmbed(self._calculate_hangar_state())
                 await message.edit(embed=embed)
 
                 processed += 1
+
+                await asyncio.sleep(1)  # To avoid hitting rate limits
             except discord.NotFound:
-                logger.warning(f"⌛ [HANGAR] [0] Hangar Embed Not Found: {embed_item.message_id}")
+                logger.warning(f"⌛⚠️ [HANGAR] [0] Cleaned Up Non-Existent Hangar Embed: {embed_item.message_id}")
                 # Remove the missing embed from tracking
                 await embed_item.delete()
             except Exception:
-                logger.exception(f"⌛ [HANGAR] [0] Error Processing Hangar Embed: {embed_item.message_id}")
+                logger.exception(f"⌛❌ [HANGAR] [0] Error Processing Hangar Embed: {embed_item.message_id}")
 
-        next_light_change: datetime = state["next_light_change"]
-
-        # Update task interval to run at the next light change time
+        new_state = self._calculate_hangar_state()  # Recalculate in case of rate limits
+        next_light_change: datetime = new_state["next_light_change"]
         self._process_hangar_embeds.change_interval(time=[next_light_change.time()])
-        logger.debug(f"⌛ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {next_light_change} UTC")
-        logger.debug(f"⌛ [HANGAR] [0] Processed {processed} Hangar Embeds")
+
+        logger.debug(f"⌛✅️ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {next_light_change} UTC")
+        logger.debug(f"⌛✅️ [HANGAR] [0] Processed {processed} Hangar Embeds")
 
     @_process_hangar_embeds.before_loop
     async def before_process_hangar_embeds(self):
@@ -260,7 +289,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             error (Exception): The raised exception
         """
 
-        logger.error("⌛ [HANGAR] [0] Error Processing Hangar Embeds", exc_info=error)
+        logger.error("⌛❌ [HANGAR] [0] Error Processing Hangar Embeds", exc_info=error)
 
     # Hangar command group
     hangar = discord.SlashCommandGroup("hangar", "Manage executive hangar operations")
@@ -308,11 +337,11 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         await ctx.followup.send(
             embed=SuccessEmbed(
                 title="Embed Created",
-                description="I've created a hangar status embed in this channel and will update it automatically.",
+                description="I've created a hangar status embed in this channel and will update it automatically",
             )
         )
 
-        logger.debug(f"[HANGAR] Created Hangar Timer Embed {message.id} In Channel {ctx.channel.id}")
+        logger.debug(f"[HANGAR] Created Hangar Timer Embed: {message.id}")
 
 
 def setup(bot: Qadir) -> None:

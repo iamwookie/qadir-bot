@@ -3,24 +3,30 @@ import sys
 
 from discord import Intents
 
-from config import DISCORD_TOKEN, PYTHON_ENV, config
+from config import DISCORD_TOKEN, config
 from core import Qadir
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG if config["app"]["debug"] else None)
-
     logger = logging.getLogger("qadir")
     logger.propagate = False
-    logger.setLevel(logging.INFO if PYTHON_ENV == "production" else logging.DEBUG)
+    logger.setLevel(logging.DEBUG if config["app"]["debug"] else logging.INFO)
+
+    formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
 
     stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
+    stream_handler.formatter = formatter
 
     file_handler = logging.FileHandler(filename="qadir.log", encoding="utf-8", mode="w")
-    file_handler.formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
+    file_handler.formatter = formatter
+    file_handler.setLevel(logging.DEBUG)
 
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.WARNING)
+    root_logger.addHandler(stream_handler)
+    root_logger.addHandler(file_handler)
 
     # Enable default intents and add privileged intents
     intents = Intents.default()
@@ -30,7 +36,6 @@ if __name__ == "__main__":
     bot = Qadir(intents=intents)
 
     bot.load_extension("cogs.utility")
-    bot.load_extension("cogs.activities")
     bot.load_extension("cogs.proposals")
     bot.load_extension("cogs.events")
     bot.load_extension("cogs.hangar")

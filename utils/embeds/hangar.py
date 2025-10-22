@@ -42,14 +42,14 @@ class HangarEmbed(discord.Embed):
         if state["status"] == "Hangar Closed":
             self.add_field(
                 name="ℹ️ Offline Phase",
-                value="Executive hangars are currently offline. LED progression indicates time until reopening.",
+                value="Executive hangars are `OFFLINE`, LED progression indicates time until reopening",
                 inline=False,
             )
         elif state["status"] == "Hangar Open":
             self.add_field(
                 name="ℹ️ Online Phase",
-                value="Executive hangars are operational! LED progression shows time remaining until closure.",
+                value="Executive hangars are `OPERATIONAL`, LED progression indicates time until closure",
                 inline=False,
             )
 
-        self.set_footer(text="Updated for Star Citizen Patch 4.3.1-LIVE (Ver 10321721)")
+        self.set_footer(text="Updated for Star Citizen Patch 4.3.2-LIVE (Server Version 10452200)")

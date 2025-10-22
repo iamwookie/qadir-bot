@@ -25,10 +25,6 @@ class ProposalsConfig(TypedDict):
     roles: list[int]
 
 
-class ActivitiesConfig(TypedDict):
-    guilds: list[int]
-
-
 class EventsConfig(TypedDict):
     guilds: list[int]
     channels: list[int]
@@ -41,7 +37,6 @@ class HangarConfig(TypedDict):
 class Config(TypedDict):
     app: AppConfig
     proposals: ProposalsConfig
-    activities: ActivitiesConfig
     events: EventsConfig
     hangar: HangarConfig
 

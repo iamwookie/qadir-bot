@@ -42,7 +42,6 @@ class Qadir(discord.Bot):
         await init_beanie(
             database=self.db,
             document_models=[
-                "models.activities.Activity",
                 "models.proposals.Proposal",
                 "models.events.Event",
                 "models.hangar.HangarEmbedItem",
@@ -57,7 +56,7 @@ class Qadir(discord.Bot):
         if not self._initialised.is_set():
             self._initialised.set()
 
-        logger.info(f"✅ Initialised: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds).")
+        logger.info(f"✅ Initialised: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
 
     async def get_or_fetch_message(self, message_id: int, channel_id: int) -> discord.Message | None:
         """
@@ -68,15 +67,15 @@ class Qadir(discord.Bot):
             channel_id (int): The ID of the channel containing the message
         """
 
-        message = self.get_message(message_id)
-        if not message:
-            channel = self.get_channel(channel_id)
-            if not channel:
-                channel = await self.fetch_channel(channel_id)
-
-            message = await channel.fetch_message(message_id)
-
-        return message
+        try:
+            message = self.get_message(message_id)
+            if not message:
+                channel = self.get_channel(channel_id) or await self.fetch_channel(channel_id)
+                message = await channel.fetch_message(message_id)
+            return message
+        except Exception:
+            logger.exception(f"[QADIR] Error Getting/Fetching Message: {message_id} <- {channel_id}")
+            return None
 
     async def on_application_command_error(self, ctx: discord.ApplicationContext, exception: Exception) -> None:
         """
@@ -100,7 +99,7 @@ class Qadir(discord.Bot):
             else:
                 logger.error("[COG] Application Command Error", exc_info=exception)
         except Exception:
-            logger.exception("[BOT] Application Command Handler Error")
+            logger.exception("[QADIR] Application Command Handler Error")
 
     async def wait_until_initialised(self) -> None:
         """Wait until the bot is fully initialised."""
