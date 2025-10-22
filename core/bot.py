@@ -42,7 +42,6 @@ class Qadir(discord.Bot):
         await init_beanie(
             database=self.db,
             document_models=[
-                "models.activity.Activity",
                 "models.proposals.Proposal",
                 "models.events.Event",
                 "models.hangar.HangarEmbedItem",
