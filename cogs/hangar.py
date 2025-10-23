@@ -34,8 +34,9 @@ from discord.ext import tasks
 
 from config import config
 from core import Cog, Qadir
-from models.hangar import HangarEmbedItem
+from models.hangar import HangarEmbedItem, HangarState
 from utils.embeds import ErrorEmbed, HangarEmbed, SuccessEmbed
+from utils.enums import HangarStatus
 
 GUILD_IDS = config["hangar"]["guilds"]
 
@@ -83,31 +84,6 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
         self._process_hangar_embeds.cancel()
 
-    def _get_next_status_change(self, current_time: datetime) -> dict:
-        """
-        Get the next status change information based on the timing system.
-
-        Args:
-            current_time (datetime): The current UTC time
-
-        Returns:
-            dict: A dictionary containing the next status change information
-        """
-
-        elapsed_time_since_initial_open = current_time - self._INITIAL_OPEN_TIME
-        elapsed_ms = elapsed_time_since_initial_open.total_seconds() * 1000
-        time_in_current_cycle = elapsed_ms % self._CYCLE_DURATION
-
-        if time_in_current_cycle < self._OPEN_DURATION:
-            # Hangars are online
-            next_status_change = current_time + timedelta(milliseconds=(self._OPEN_DURATION - time_in_current_cycle))
-            return {"status": "ONLINE", "next_status_change": next_status_change}
-        else:
-            # Hangars are offline
-            remaining_close_duration = time_in_current_cycle - self._OPEN_DURATION
-            next_status_change = current_time + timedelta(milliseconds=(self._CLOSE_DURATION - remaining_close_duration))
-            return {"status": "OFFLINE", "next_status_change": next_status_change}
-
     def _get_next_light_change(self, current_time: datetime, time_in_cycle: float) -> datetime:
         """
         Calculate the next light change time based on the current position in the cycle.
@@ -142,21 +118,29 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             time_until_next_cycle_ms: float = (self._CYCLE_DURATION - time_in_cycle) + 1000
             return current_time + timedelta(milliseconds=time_until_next_cycle_ms)
 
-    def _calculate_hangar_state(self) -> dict:
+    def _calculate_hangar_state(self) -> HangarState:
         """
         Calculate current hangar state based on the new exec.xyxll.com timing system.
 
         Returns:
-            dict: A dictionary containing hangar state information
+            HangarState: An object containing hangar state information
         """
 
-        current_time = discord.utils.utcnow()
-        status_info = self._get_next_status_change(current_time)
-
         # Calculate time in current cycle
+        current_time = discord.utils.utcnow()
         elapsed_time_since_initial_open = current_time - self._INITIAL_OPEN_TIME
         elapsed_ms = elapsed_time_since_initial_open.total_seconds() * 1000
         time_in_cycle = elapsed_ms % self._CYCLE_DURATION
+
+        if time_in_cycle < self._OPEN_DURATION:
+            # Hangars are online
+            next_status_change = current_time + timedelta(milliseconds=(self._OPEN_DURATION - time_in_cycle))
+            status = HangarStatus.ONLINE
+        else:
+            # Hangars are offline
+            remaining_close_duration = time_in_cycle - self._OPEN_DURATION
+            next_status_change = current_time + timedelta(milliseconds=(self._CLOSE_DURATION - remaining_close_duration))
+            status = HangarStatus.OFFLINE
 
         # Find which threshold we're in
         current_threshold = None
@@ -182,23 +166,14 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 lights.append("⚫")
 
         # Determine status and color based on online/offline
-        if status_info["status"] == "ONLINE":
-            status = "Hangar Open"
-            color = 0x32CD32  # Green
-        else:
-            status = "Hangar Closed"
-            color = 0xFF0000  # Red
 
-        next_status_change: datetime = status_info["next_status_change"]
-        next_light_change = self._get_next_light_change(current_time, time_in_cycle)
-
-        return {
-            "status": status,
-            "color": color,
-            "lights": lights,
-            "next_status_change": next_status_change,
-            "next_light_change": next_light_change,
-        }
+        return HangarState(
+            status=status,
+            color=0x32CD32 if status == HangarStatus.ONLINE else 0xFF0000,
+            lights=lights,
+            next_status_change=next_status_change,
+            next_light_change=self._get_next_light_change(current_time, time_in_cycle),
+        )
 
     async def _get_or_fetch_hangar_data(self) -> list[HangarEmbedItem] | None:
         """
@@ -254,8 +229,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
 
                 channel = self.bot.get_partial_messageable(channel_id)
                 message = channel.get_partial_message(message_id)
-                embed = HangarEmbed(self._calculate_hangar_state())
-                await message.edit(embed=embed)
+                await message.edit(embed=HangarEmbed(self._calculate_hangar_state()))
 
                 processed += 1
 
