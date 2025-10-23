@@ -54,13 +54,9 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         return any(role.id in ROLE_IDS for role in ctx.author.roles)
 
-    @tasks.loop(hours=24)
+    @tasks.loop(hours=12)
     async def _process_proposals(self) -> None:
-        """
-        Process and finalize proposals that are over a day old.
-
-        Posts results and locks threads.
-        """
+        """Process and finalize proposals that are over a day old."""
 
         logger.debug("⌛🔄 [PROPOSALS] [0] Processing Proposals...")
 
@@ -74,16 +70,16 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         for proposal in proposals:
             try:
-                thread: discord.Thread = await self.bot.fetch_channel(int(proposal.thread_id))
-                message: discord.Message = await thread.fetch_message(int(proposal.message_id))
+                thread: discord.Thread = await self.bot.get_or_fetch_channel(int(proposal.thread_id))
+                message: discord.Message = thread.get_partial_message(int(proposal.message_id))
 
-                if (discord.utils.utcnow() - message.created_at).total_seconds() < 86400:
+                if (discord.utils.utcnow() - thread.created_at).total_seconds() < 86400:
                     continue
 
                 upvotes = len(proposal.votes.upvotes)
                 downvotes = len(proposal.votes.downvotes)
 
-                embed = discord.Embed(title="Proposal Closed", description="Voting has ended for this proposal.", colour=0xFF0000)
+                embed = discord.Embed(title="Proposal Closed", description="Voting has ended for this proposal", colour=0xFF0000)
                 embed.add_field(name="👍 Upvotes", value=f"`{upvotes}`", inline=True)
                 embed.add_field(name="👎 Downvotes", value=f"`{downvotes}`", inline=True)
 
@@ -92,7 +88,6 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
                 await thread.edit(locked=True)
 
                 proposal.status = ProposalStatus.CLOSED
-
                 await proposal.replace()
 
                 processed += 1

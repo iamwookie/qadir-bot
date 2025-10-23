@@ -51,7 +51,7 @@ class CreateProposalModal(discord.ui.Modal):
         outcome_embed = discord.Embed(title="Expected Outcome", description=self.children[3].value)
         outcome_embed.set_footer(text=interaction.user, icon_url=interaction.user.display_avatar.url)
 
-        poll_embed = discord.Embed(description="Please use the buttons below to cast your vote.")
+        poll_embed = discord.Embed(description="Please use the buttons below to cast your vote")
         poll_embed.add_field(name="👍 Upvotes", value="`0`", inline=True)
         poll_embed.add_field(name="👎 Downvotes", value="`0`", inline=True)
         poll_embed.set_footer(text="Voting will close in 24 hours")

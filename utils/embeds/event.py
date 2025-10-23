@@ -5,9 +5,7 @@ from utils.enums import EventStatus
 
 
 class EventEmbed(discord.Embed):
-    """
-    A custom embed class for displaying event information.
-    """
+    """A custom embed class for displaying event information."""
 
     def __init__(self, name: str, desc: str, status: EventStatus, participants: list[str], loot_entries: list[LootEntry], **kwargs) -> None:
         super().__init__(

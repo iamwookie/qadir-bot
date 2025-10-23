@@ -37,7 +37,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
     async def get_or_fetch_event_by_id(self, thread_id: int) -> Event | None:
         """
-        Fetch event data by thread ID. Uses cache if available.
+        Get or fetch an event data by thread ID.
 
         Args:
             thread_id (int): The Discord thread ID of the event
@@ -71,11 +71,8 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             event (Event): The event object to update the card with.
         """
 
-        message_id = int(event.message_id)
-        thread_id = int(event.thread_id)
-
         # Get or fetch the message
-        message = await self.bot.get_or_fetch_message(message_id, thread_id)
+        message = await self.bot.get_or_fetch_message(int(event.message_id), int(event.thread_id))
 
         # Create new embed with fresh data
         event_embed = EventEmbed(
@@ -96,16 +93,14 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         # Update the message
         await message.edit(embeds=[event_embed, message.embeds[1]])  # Keep the instructions embed
 
-        logger.debug(f"[EVENTS] Updated Event Card For: {thread_id} ({event.name})")
+        logger.debug(f"[EVENTS] Updated Event Card For: {event.thread_id} ({event.name})")
 
     # Main events command group
     event = discord.SlashCommandGroup("event", "Manage loot tracking events")
 
     @event.command(description="Create a new loot tracking event")
     async def create(self, ctx: discord.ApplicationContext) -> None:
-        """
-        Create a new loot tracking event where participants can add items and see automatic distribution.
-        """
+        """Create a new loot tracking event where participants can add items and see automatic distribution."""
 
         # Check if command is used in allowed channels
         if ctx.channel_id not in CHANNEL_IDS:
@@ -319,8 +314,8 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         # Send confirmation
         final_embed = discord.Embed(
             title="Event Finalised",
-            description=f"""**{event.name}** has concluded.
-            A summary can be found in {ctx.channel.mention}.""",
+            description=f"""**{event.name}** has concluded
+            A summary can be found in {ctx.channel.mention}""",
             colour=0xFFD700,
         )
         final_embed.set_footer(text="The event has been locked. No more changes can be made")
