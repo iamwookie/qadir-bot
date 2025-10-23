@@ -23,28 +23,29 @@ class HangarEmbed(discord.Embed):
         self.set_author(name="Provided by: exec.xyxyll.com", url="https://exec.xyxyll.com")
 
         # Status field
-        self.add_field(name="🎯 Current Status", value=f"**{state.status}**", inline=True)
+        status = "🟢 **Online**" if state.status == HangarStatus.ONLINE else "🔴 **Offline**"
+        self.add_field(name="Current Status", value=status, inline=True)
 
         # Discord timestamp field - shows exact time in user's timezone
-        self.add_field(name="⏰ Next Status Change", value=f"<t:{int(dt_to_psx(state.next_status_change))}:R>", inline=True)
+        self.add_field(name="Next Status Change", value=f"<t:{int(dt_to_psx(state.next_status_change))}:R>", inline=True)
 
         # Discord timestamp field - shows exact time in user's timezone
-        self.add_field(name="⏰ Next Light Change", value=f"<t:{int(dt_to_psx(state.next_light_change))}:R>", inline=True)
+        self.add_field(name="Next Light Change", value=f"<t:{int(dt_to_psx(state.next_light_change))}:R>", inline=True)
 
         # LED lights status (visual indicator)
-        self.add_field(name="💡 LED Status", value=" ".join(state.lights), inline=False)
+        self.add_field(name="LED Status", value=" ".join(state.lights), inline=False)
 
         # Add explanation based on new timing system
         if state.status == HangarStatus.OFFLINE:
             self.add_field(
-                name="ℹ️ Offline Phase",
-                value="Executive hangars are `OFFLINE`, LED progression indicates time until reopening",
+                name="Offline Phase",
+                value="Executive hangars are currently `OFFLINE`, the LED progression indicates time until reopening",
                 inline=False,
             )
         elif state.status == HangarStatus.ONLINE:
             self.add_field(
-                name="ℹ️ Online Phase",
-                value="Executive hangars are `OPERATIONAL`, LED progression indicates time until closure",
+                name="Online Phase",
+                value="Executive hangars are currently `ONLINE`, the LED progression indicates time until closure",
                 inline=False,
             )
 
