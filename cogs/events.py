@@ -237,10 +237,13 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         # Check if user is a participant
         if str(ctx.author.id) not in event.participants:
-            embed = ErrorEmbed(
-                "Not Participating", ("You must join this event before adding loot.\n" "Use `/event join` to join this event.")
+            await ctx.respond(
+                embed=ErrorEmbed(
+                    title="Not Participating",
+                    description=("You must join this event before adding loot\n" "Use `/event join` to join this event"),
+                ),
+                ephemeral=True,
             )
-            await ctx.respond(embed=embed, ephemeral=True)
             return
 
         # Fetch available items
@@ -248,15 +251,19 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         items_data = await self.redis.get(f"{self.REDIS_PREFIX}:items")
 
         if not items_data:
-            embed = ErrorEmbed("No Items Configured", "No items are configured for loot tracking. Please contact an administrator.")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.respond(
+                embed=ErrorEmbed(
+                    title="No Items Configured",
+                    description="No items are configured for loot tracking, please contact an administrator",
+                ),
+                ephemeral=True,
+            )
             return
 
         items = [LootItem(**item) for item in json.loads(items_data)]
 
         # Show the AddLootModal
-        modal = AddLootModal(self, event, items)
-        await ctx.send_modal(modal)
+        await ctx.send_modal(AddLootModal(self, event, items))
 
     @event.command(description="Finalise and close an event you created")
     async def finalise(self, ctx: discord.ApplicationContext) -> None:
@@ -272,15 +279,19 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         # Check if this is an event thread
         if not isinstance(ctx.channel, discord.Thread):
-            embed = ErrorEmbed(None, "This command can only be used in event threads.")
-            await ctx.followup.send(embed=embed, ephemeral=True)
+            await ctx.followup.send(
+                embed=ErrorEmbed(title=None, description="This command can only be used in event threads"),
+                ephemeral=True,
+            )
             return
 
         thread_id = ctx.channel.id
         event = await self.get_or_fetch_event_by_id(thread_id)
         if not event:
-            embed = ErrorEmbed(None, "This thread is not associated with an active event.")
-            await ctx.followup.send(embed=embed, ephemeral=True)
+            await ctx.followup.send(
+                embed=ErrorEmbed(title=None, description="This thread is not associated with an active event"),
+                ephemeral=True,
+            )
             return
 
         # Check if user is the event creator
@@ -288,17 +299,18 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         current_user_id = str(ctx.author.id)
 
         if current_user_id != creator_id:
-            embed = ErrorEmbed(
-                "Permission Denied",
-                f"Only the event creator can finalise the event.\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>",
+            await ctx.followup.send(
+                embed=ErrorEmbed(
+                    title="Permission Denied",
+                    description=f"Only the event creator can finalise the event\n\nEvent creator: <@{creator_id}>\nYou are: <@{current_user_id}>",
+                ),
+                ephemeral=True,
             )
-            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Check if event is already finalised
         if event.status != EventStatus.ACTIVE:
-            embed = ErrorEmbed(None, "This event is already finalised.")
-            await ctx.followup.send(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=ErrorEmbed(title=None, description="This event is already finalised."), ephemeral=True)
             return
 
         # Update event status
@@ -312,14 +324,14 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         await self.update_event_card(event)
 
         # Send confirmation
-        final_embed = discord.Embed(
+        embed = discord.Embed(
             title="Event Finalised",
             description=f"""**{event.name}** has concluded
             A summary can be found in {ctx.channel.mention}""",
             colour=0xFFD700,
         )
-        final_embed.set_footer(text="The event has been locked. No more changes can be made")
-        await ctx.followup.send(embed=final_embed, ephemeral=True)
+        embed.set_footer(text="The event has been locked. No more changes can be made")
+        await ctx.followup.send(embed=embed, ephemeral=True)
 
         # Lock the thread to prevent further messages
         await ctx.channel.edit(locked=True)
@@ -340,20 +352,19 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         # Get all active events for the user
         events = await Event.find(Event.creator_id == str(ctx.author.id)).to_list()
         if not events:
-            embed = ErrorEmbed(None, "You haven't created any active events.")
-            await ctx.followup.send(embed=embed, ephemeral=True)
+            await ctx.followup.send(embed=ErrorEmbed(title=None, description="You haven't created any active events"), ephemeral=True)
             return
 
         embed = SuccessEmbed(title="Your Events", description="A summary of the events you've created:")
 
-        created_text: list[str] = []
+        text: list[str] = []
         for event in events:
             status_emoji = "🟢" if event.status == EventStatus.ACTIVE else "🔴"
-            created_text.append(
+            text.append(
                 f"{status_emoji} **{event.name}** (`{len(event.participants)}` participant(s), `{len(event.loot_entries)}` item(s))"
             )
 
-        embed.description = "\n".join(created_text)
+        embed.description = "\n".join(text)
 
         await ctx.followup.send(embed=embed, ephemeral=True)
 
