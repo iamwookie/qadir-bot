@@ -224,16 +224,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         # Update each tracked embed
         for embed_item in embed_items:
             try:
-                message_id = int(embed_item.message_id)
-                channel_id = int(embed_item.channel_id)
-
-                channel = self.bot.get_partial_messageable(channel_id)
-                message = channel.get_partial_message(message_id)
+                channel = self.bot.get_partial_messageable(int(embed_item.channel_id))
+                message = channel.get_partial_message(int(embed_item.message_id))
                 await message.edit(embed=HangarEmbed(self._calculate_hangar_state()))
-
                 processed += 1
 
-                await asyncio.sleep(1)  # To avoid hitting rate limits
+                # Sleep briefly to avoid hitting rate limits
+                await asyncio.sleep(1)
             except discord.NotFound:
                 logger.warning(f"⌛⚠️ [HANGAR] [0] Cleaned Up Non-Existent Hangar Embed: {embed_item.message_id}")
                 # Remove the missing embed from tracking
