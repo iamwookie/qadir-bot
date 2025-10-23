@@ -105,8 +105,10 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         # Check if command is used in allowed channels
         if ctx.channel_id not in CHANNEL_IDS:
             allowed_channels = [f"<#{channel_id}>" for channel_id in CHANNEL_IDS]
-            embed = ErrorEmbed(None, f"This command can only be used in: {', '.join(allowed_channels)}")
-            await ctx.respond(embed=embed, ephemeral=True)
+            await ctx.respond(
+                embed=ErrorEmbed(title=None, description=f"This command can only be used in: {', '.join(allowed_channels)}"),
+                ephemeral=True,
+            )
             return
 
         modal = CreateEventModal(self, title="Create Loot Event")
@@ -129,16 +131,18 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             if event:
                 # Check if user is already a participant in this event
                 if str(ctx.author.id) in event.participants:
-                    embed = SuccessEmbed(
-                        title="Already Participating",
-                        description=(
-                            f"You're already participating in **{event.name}**.\n\n"
-                            f"**You can now:**\n"
-                            f"• Use `/event loot` to add items you've collected.\n"
-                            f"• Check the event card above for current totals."
+                    await ctx.respond(
+                        embed=SuccessEmbed(
+                            title="Already Participating",
+                            description=(
+                                f"You're already participating in **{event.name}**.\n\n"
+                                f"**You can now:**\n"
+                                f"• Use `/event loot` to add items you've collected.\n"
+                                f"• Check the event card above for current totals."
+                            ),
                         ),
+                        ephemeral=True,
                     )
-                    await ctx.respond(embed=embed, ephemeral=True)
                     return
                 else:
                     # User is not in this event, join them directly
@@ -154,16 +158,18 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
                     # Update the event card with the new participant
                     await self.update_event_card(event)
 
-                    embed = SuccessEmbed(
-                        title="Joined Event",
-                        description=(
-                            f"I have added you to **{event.name}**\n\n"
-                            f"**You can now:**\n"
-                            f"• Use `/event loot` in this thread to add items\n"
-                            f"• Check the event card above for current totals"
+                    await ctx.followup.send(
+                        embed=SuccessEmbed(
+                            title="Joined Event",
+                            description=(
+                                f"I have added you to **{event.name}**\n\n"
+                                f"**You can now:**\n"
+                                f"• Use `/event loot` in this thread to add items\n"
+                                f"• Check the event card above for current totals"
+                            ),
                         ),
+                        ephemeral=True,
                     )
-                    await ctx.followup.send(embed=embed, ephemeral=True)
                     return
 
         await ctx.defer(ephemeral=True)
@@ -171,15 +177,17 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         # Fetch active events
         active_events = await Event.find(Event.status == EventStatus.ACTIVE).to_list()
         if not active_events:
-            embed = ErrorEmbed(
-                "No Active Events",
-                (
-                    "There are no active events to join right now.\n\n"
-                    "**Want to create an event?**\n"
-                    f"• Use `/event create` in <#{CHANNEL_IDS[0]}>."
+            await ctx.followup.send(
+                embed=ErrorEmbed(
+                    title="No Active Events",
+                    description=(
+                        "There are no active events to join right now.\n\n"
+                        "**Want to create an event?**\n"
+                        f"• Use `/event create` in <#{CHANNEL_IDS[0]}>."
+                    ),
                 ),
+                ephemeral=True,
             )
-            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Filter events user can join (not already a member of)
@@ -190,17 +198,21 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             user_events = [event for event in active_events if str(ctx.author.id) in event.participants]
             event_list = "\n".join([f"• 🏆 **{event.name}**" for event in user_events])
 
-            embed = SuccessEmbed(
-                title="Already Participating",
-                description=f"You're already participating in all active events:\n\n{event_list}",
+            await ctx.followup.send(
+                embed=SuccessEmbed(
+                    title="Already Participating",
+                    description=f"You're already participating in all active events:\n\n{event_list}",
+                ),
+                ephemeral=True,
             )
-            await ctx.followup.send(embed=embed, ephemeral=True)
             return
 
         # Show event selection
-        embed = SuccessEmbed(title="Join an Event", description="Select an event to join from the dropdown below:")
-        view = EventSelectionView(self, active_events, ctx.author.id)
-        await ctx.followup.send(embed=embed, view=view, ephemeral=True)
+        await ctx.followup.send(
+            embed=SuccessEmbed(title="Join an Event", description="Select an event to join from the dropdown below"),
+            view=EventSelectionView(self, active_events, ctx.author.id),
+            ephemeral=True,
+        )
 
     @event.command(description="Add loot items you've collected to an event")
     async def loot(self, ctx: discord.ApplicationContext) -> None:
@@ -213,8 +225,8 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         """
 
         thread_error_embed = ErrorEmbed(
-            "Not In Event Thread",
-            (
+            title="Not In Event Thread",
+            description=(
                 "This command can only be used in event threads.\n\n"
                 "**To add loot:**\n"
                 "1. Use `/event create` to create an event or `/event join` to join an event.\n"
