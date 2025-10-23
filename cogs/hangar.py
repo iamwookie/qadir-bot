@@ -242,10 +242,9 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 logger.exception(f"⌛❌ [HANGAR] [0] Error Processing Hangar Embed: {embed_item.message_id}")
 
         new_state = self._calculate_hangar_state()  # Recalculate in case of rate limits
-        next_light_change: datetime = new_state["next_light_change"]
-        self._process_hangar_embeds.change_interval(time=[next_light_change.time()])
+        self._process_hangar_embeds.change_interval(time=[new_state.next_light_change.time()])
 
-        logger.debug(f"⌛✅️ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {next_light_change} UTC")
+        logger.debug(f"⌛✅️ [HANGAR] [0] Processing Hangar Embeds Rescheduled To: {new_state.next_light_change} UTC")
         logger.debug(f"⌛✅️ [HANGAR] [0] Processed {processed} Hangar Embeds")
 
     @_process_hangar_embeds.before_loop
