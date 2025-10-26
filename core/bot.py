@@ -58,42 +58,6 @@ class Qadir(discord.Bot):
 
         logger.info(f"✅ Initialised: {self.user} ({round(self.latency * 1000)}ms) ({len(self.guilds)} guilds)")
 
-    async def get_or_fetch_message(self, message_id: int, channel_id: int) -> discord.Message | None:
-        """
-        Get a message from the cache or fetch it from the API.
-
-        Args:
-            message_id (int): The ID of the message to get
-            channel_id (int): The ID of the channel containing the message
-        """
-
-        try:
-            message = self.get_message(message_id)
-            if not message:
-                channel = self.get_channel(channel_id) or await self.fetch_channel(channel_id)
-                message = await channel.fetch_message(message_id)
-            return message
-        except Exception:
-            logger.exception(f"[QADIR] Error Getting/Fetching Message: {message_id} <- {channel_id}")
-            return None
-
-    async def get_or_fetch_channel(self, channel_id: int) -> discord.TextChannel | None:
-        """
-        Get a channel from the cache or fetch it from the API.
-
-        Args:
-            channel_id (int): The ID of the channel to get
-        """
-
-        try:
-            channel = self.get_channel(channel_id)
-            if not channel:
-                channel = await self.fetch_channel(channel_id)
-            return channel
-        except Exception:
-            logger.exception(f"[QADIR] Error Getting/Fetching Channel: {channel_id}")
-            return None
-
     async def on_application_command_error(self, ctx: discord.ApplicationContext, exception: Exception) -> None:
         """
         Handle errors for application commands for the entire application.
