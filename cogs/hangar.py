@@ -230,7 +230,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
                 processed += 1
 
                 # Sleep briefly to avoid hitting rate limits
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
             except discord.NotFound:
                 logger.warning(f"⌛⚠️ [HANGAR] [0] Cleaned Up Non-Existent Hangar Embed: {embed_item.message_id}")
                 # Remove the missing embed from tracking
