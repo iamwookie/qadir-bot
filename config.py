@@ -34,11 +34,16 @@ class HangarConfig(TypedDict):
     guilds: list[int]
 
 
+class VoiceConfig(TypedDict):
+    channels: list[int]
+
+
 class Config(TypedDict):
     app: AppConfig
     proposals: ProposalsConfig
     events: EventsConfig
     hangar: HangarConfig
+    voice: VoiceConfig
 
 
 def load_config() -> Config:

@@ -39,5 +39,6 @@ if __name__ == "__main__":
     bot.load_extension("cogs.proposals")
     bot.load_extension("cogs.events")
     bot.load_extension("cogs.hangar")
+    bot.load_extension("cogs.voice")
 
     bot.run(DISCORD_TOKEN)
