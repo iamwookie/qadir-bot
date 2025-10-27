@@ -35,7 +35,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
-    async def get_or_fetch_event_by_id(self, thread_id: int) -> Event | None:
+    async def get_or_fetch_event(self, thread_id: int) -> Event | None:
         """
         Get or fetch an event data by thread ID.
 
@@ -72,7 +72,8 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         """
 
         # Get or fetch the message
-        message = await self.bot.get_or_fetch_message(int(event.message_id), int(event.thread_id))
+        thread = await self.bot.get_or_fetch(discord.Thread, int(event.thread_id))
+        message = thread.get_partial_message(int(event.message_id))
 
         # Create new embed with fresh data
         event_embed = EventEmbed(
@@ -127,7 +128,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         if isinstance(ctx.channel, discord.Thread):
             thread_id = ctx.channel.id
 
-            event = await self.get_or_fetch_event_by_id(ctx.channel.id)
+            event = await self.get_or_fetch_event(ctx.channel.id)
             if event:
                 # Check if user is already a participant in this event
                 if str(ctx.author.id) in event.participants:
@@ -242,7 +243,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             return
 
         thread_id = ctx.channel.id
-        event = await self.get_or_fetch_event_by_id(thread_id)
+        event = await self.get_or_fetch_event(thread_id)
         if not event:
             await ctx.respond(embed=thread_error_embed, ephemeral=True)
             return
@@ -298,7 +299,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             return
 
         thread_id = ctx.channel.id
-        event = await self.get_or_fetch_event_by_id(thread_id)
+        event = await self.get_or_fetch_event(thread_id)
         if not event:
             await ctx.followup.send(
                 embed=ErrorEmbed(title=None, description="This thread is not associated with an active event"),

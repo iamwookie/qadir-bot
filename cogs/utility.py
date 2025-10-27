@@ -169,13 +169,14 @@ class UtilityCog(Cog, name="Utility"):
         not_found_embed = ErrorEmbed("Not Found", "The user was not found.")
 
         try:
-            user = await self.bot.get_or_fetch_user(int(user_id_str))
+            user = await self.bot.get_or_fetch(discord.User, int(user_id_str))
         except discord.NotFound:
             await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
         except ValueError:
             await ctx.followup.send(
-                embed=ErrorEmbed("Invalid User ID", "Invalid user ID provided, e.g. 123456789012345678"), ephemeral=True
+                embed=ErrorEmbed("Invalid User ID", "Invalid user ID provided, e.g. 123456789012345678"),
+                ephemeral=True,
             )
             return
 

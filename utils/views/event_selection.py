@@ -48,7 +48,7 @@ class EventSelect(discord.ui.Select):
 
         selected_thread_id = int(self.values[0])
 
-        event = await self.cog.get_or_fetch_event_by_id(selected_thread_id)
+        event = await self.cog.get_or_fetch_event(selected_thread_id)
         if not event:
             embed = ErrorEmbed(title="Event Not Found", description="The event you are trying to join does not exist")
             await interaction.followup.send(embed=embed, ephemeral=True)
