@@ -51,7 +51,7 @@ class Qadir(discord.Bot):
         for cog in self.cogs:
             logger.info(f"🔗 Loaded Cog: {cog}")
 
-        await self.change_presence(activity=discord.CustomActivity(name=f"🌐 v{config['app']['version']} • /help"))
+        await self.change_presence(activity=discord.CustomActivity(name=f"v{config['app']['version']} • /help"))
 
         if not self._initialised.is_set():
             self._initialised.set()
