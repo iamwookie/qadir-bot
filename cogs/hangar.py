@@ -311,7 +311,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             )
         )
 
-        logger.debug(f"[HANGAR] Created Hangar Timer Embed: {message.id}")
+        logger.debug(f"[HANGAR] Created Hangar Embed: {message.id}")
 
 
 def setup(bot: Qadir) -> None:
