@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
+APP_DEBUG = os.getenv("APP_DEBUG", "true").lower() == "true"
 PYTHON_ENV = os.getenv("PYTHON_ENV", "development")
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 UPSTASH_REDIS_REST_URL = os.environ["UPSTASH_REDIS_REST_URL"]

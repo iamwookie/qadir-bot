@@ -3,13 +3,13 @@ import sys
 
 from discord import Intents
 
-from config import DISCORD_TOKEN, config
+from config import APP_DEBUG, DISCORD_TOKEN
 from core import Qadir
 
 if __name__ == "__main__":
     logger = logging.getLogger("qadir")
     logger.propagate = False
-    logger.setLevel(logging.DEBUG if config["app"]["debug"] else logging.INFO)
+    logger.setLevel(logging.DEBUG if APP_DEBUG else logging.INFO)
 
     formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S")
 
