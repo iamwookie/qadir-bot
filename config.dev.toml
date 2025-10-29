@@ -1,6 +1,6 @@
 [app]
 name = "Qadir DEV"
-version = "3.2.1"
+version = "3.2.2"
 
 [proposals]
 guilds = [1121743509372805122, 1217554572554408118]
