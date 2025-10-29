@@ -17,7 +17,6 @@ MONGODB_URI = os.environ["MONGODB_URI"]
 class AppConfig(TypedDict):
     name: str
     version: str
-    debug: bool
 
 
 class ProposalsConfig(TypedDict):
