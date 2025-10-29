@@ -8,7 +8,7 @@
     </a>
 </p>
 
-A modular utility bot for Discord built with [Pycord](https://docs.pycord.dev/) and powered by [Upstash Redis](https://upstash.com/).  
+A modular utility bot for Discord built with [Pycord](https://docs.pycord.dev/), powered by [Upstash Redis](https://upstash.com/) and [MongoDB](https://www.mongodb.com/).  
 Designed for performance, modularity, and ease of deployment.
 
 ## 🛠 Requirements
