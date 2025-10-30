@@ -51,8 +51,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     _REDIS_PREFIX: str = "qadir:hangar"
     _REDIS_TTL: int = 3600  # seconds
 
-    _OPEN_DURATION: int = 3900381  # milliseconds
-    _CLOSE_DURATION: int = 7200704  # milliseconds
+    _OPEN_DURATION: int = 3900496  # milliseconds
+    _CLOSE_DURATION: int = 7200917  # milliseconds
     _CYCLE_DURATION: int = _OPEN_DURATION + _CLOSE_DURATION
 
     # Original Timestamp: 2025-10-16T13:43:24.402-04:00 (EDT, UTC-4)
