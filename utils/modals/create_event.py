@@ -19,7 +19,7 @@ class CreateEventModal(discord.ui.Modal):
     """Modal for creating a loot tracking event."""
 
     def __init__(self, cog: "EventsCog", *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, title="Create an Event")
 
         self.cog: "EventsCog" = cog
         self.redis = cog.redis
