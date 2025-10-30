@@ -12,7 +12,6 @@ from utils.modals import AddLootModal, CreateEventModal
 from utils.views import EventSelectionView
 
 GUILD_IDS = config["events"]["guilds"]
-CHANNEL_IDS = config["events"]["channels"]
 
 logger = logging.getLogger("qadir")
 
@@ -103,17 +102,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
     async def create(self, ctx: discord.ApplicationContext) -> None:
         """Create a new loot tracking event where participants can add items and see automatic distribution."""
 
-        # Check if command is used in allowed channels
-        if ctx.channel_id not in CHANNEL_IDS:
-            allowed_channels = [f"<#{channel_id}>" for channel_id in CHANNEL_IDS]
-            await ctx.respond(
-                embed=ErrorEmbed(title=None, description=f"This command can only be used in: {', '.join(allowed_channels)}"),
-                ephemeral=True,
-            )
-            return
-
-        modal = CreateEventModal(self, title="Create Loot Event")
-        await ctx.send_modal(modal)
+        await ctx.send_modal(CreateEventModal(self))
 
     @event.command(description="Join an active event to participate in loot tracking")
     async def join(self, ctx: discord.ApplicationContext) -> None:
@@ -181,11 +170,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             await ctx.followup.send(
                 embed=ErrorEmbed(
                     title="No Active Events",
-                    description=(
-                        "There are no active events to join right now.\n\n"
-                        "**Want to create an event?**\n"
-                        f"• Use `/event create` in <#{CHANNEL_IDS[0]}>."
-                    ),
+                    description=("There are no active events to join right now.\n\n" "• Use `/event create` to create an event."),
                 ),
                 ephemeral=True,
             )
@@ -233,7 +218,6 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
                 "1. Use `/event create` to create an event or `/event join` to join an event.\n"
                 "2. Go to the event thread.\n"
                 "3. Use `/event loot` in that thread.\n\n"
-                f"**Find or create events in:** <#{CHANNEL_IDS[0]}>."
             ),
         )
 

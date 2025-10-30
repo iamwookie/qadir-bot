@@ -27,7 +27,6 @@ class ProposalsConfig(TypedDict):
 
 class EventsConfig(TypedDict):
     guilds: list[int]
-    channels: list[int]
 
 
 class HangarConfig(TypedDict):
