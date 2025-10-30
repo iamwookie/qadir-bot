@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
+APP_DEBUG = os.getenv("APP_DEBUG", "true").lower() == "true"
 PYTHON_ENV = os.getenv("PYTHON_ENV", "development")
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 UPSTASH_REDIS_REST_URL = os.environ["UPSTASH_REDIS_REST_URL"]
@@ -16,7 +17,6 @@ MONGODB_URI = os.environ["MONGODB_URI"]
 class AppConfig(TypedDict):
     name: str
     version: str
-    debug: bool
 
 
 class ProposalsConfig(TypedDict):
@@ -27,11 +27,14 @@ class ProposalsConfig(TypedDict):
 
 class EventsConfig(TypedDict):
     guilds: list[int]
-    channels: list[int]
 
 
 class HangarConfig(TypedDict):
     guilds: list[int]
+
+
+class VoiceConfig(TypedDict):
+    channels: list[int]
 
 
 class Config(TypedDict):
@@ -39,6 +42,7 @@ class Config(TypedDict):
     proposals: ProposalsConfig
     events: EventsConfig
     hangar: HangarConfig
+    voice: VoiceConfig
 
 
 def load_config() -> Config:

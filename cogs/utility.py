@@ -166,32 +166,31 @@ class UtilityCog(Cog, name="Utility"):
         await ctx.defer(ephemeral=True)
 
         user_id_str = user_id.strip() if user_id else str(ctx.author.id)
-        not_found_embed = ErrorEmbed("Not Found", "The user was not found.")
 
+        # Fetch the full user from the API
         try:
-            user = await self.bot.get_or_fetch_user(int(user_id_str))
+            user = await self.bot.fetch_user(int(user_id_str))
         except discord.NotFound:
-            await ctx.followup.send(embed=not_found_embed, ephemeral=True)
+            await ctx.followup.send(embed=ErrorEmbed(title="Not Found", description="The user was not found"))
             return
         except ValueError:
             await ctx.followup.send(
-                embed=ErrorEmbed("Invalid User ID", "Invalid user ID provided, e.g. 123456789012345678"), ephemeral=True
+                embed=ErrorEmbed(
+                    title="Invalid User ID",
+                    description="Invalid user ID provided, e.g. 123456789012345678",
+                ),
             )
-            return
-
-        if not user:
-            await ctx.followup.send(embed=not_found_embed, ephemeral=True)
             return
 
         embed = discord.Embed(title="User Information", colour=0xFFFFFF)
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="Name", value=f"`{str(user)}`", inline=False)
         embed.add_field(name="User ID", value=f"`{user.id}`", inline=False)
-        embed.add_field(name="Account Created", value=f"<t:{dt_to_psx(user.created_at)}:R>", inline=False)
+        embed.add_field(name="Account Created", value=f"<t:{int(dt_to_psx(user.created_at))}:R>", inline=False)
 
         if isinstance(ctx.guild, discord.Guild):
             try:
-                member = ctx.guild.get_member(user.id) or await ctx.guild.fetch_member(user.id)
+                member = await ctx.guild.get_or_fetch(discord.Member, user.id)
 
                 if member.joined_at:
                     embed.add_field(name="Server Joined", value=f"<t:{dt_to_psx(member.joined_at)}:R>", inline=False)

@@ -70,8 +70,8 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=GUILD_IDS):
 
         for proposal in proposals:
             try:
-                thread: discord.Thread = await self.bot.get_or_fetch_channel(int(proposal.thread_id))
-                message: discord.Message = thread.get_partial_message(int(proposal.message_id))
+                thread = await self.bot.get_or_fetch(discord.Thread, int(proposal.thread_id))
+                message = thread.get_partial_message(int(proposal.message_id))
 
                 if (discord.utils.utcnow() - thread.created_at).total_seconds() < 86400:
                     continue

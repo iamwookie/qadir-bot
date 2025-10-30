@@ -49,4 +49,4 @@ class HangarEmbed(discord.Embed):
                 inline=False,
             )
 
-        self.set_footer(text="Updated for Star Citizen Patch 4.3.2-LIVE (Server Version 10452200)")
+        self.set_footer(text="Updated for Star Citizen Patch 4.3.2-LIVE (Server Version 10487514)")

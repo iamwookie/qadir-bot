@@ -12,7 +12,6 @@ from utils.modals import AddLootModal, CreateEventModal
 from utils.views import EventSelectionView
 
 GUILD_IDS = config["events"]["guilds"]
-CHANNEL_IDS = config["events"]["channels"]
 
 logger = logging.getLogger("qadir")
 
@@ -35,7 +34,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
 
         super().__init__(bot)
 
-    async def get_or_fetch_event_by_id(self, thread_id: int) -> Event | None:
+    async def get_or_fetch_event(self, thread_id: int) -> Event | None:
         """
         Get or fetch an event data by thread ID.
 
@@ -72,7 +71,8 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         """
 
         # Get or fetch the message
-        message = await self.bot.get_or_fetch_message(int(event.message_id), int(event.thread_id))
+        thread = await self.bot.get_or_fetch(discord.Thread, int(event.thread_id))
+        message = thread.get_partial_message(int(event.message_id))
 
         # Create new embed with fresh data
         event_embed = EventEmbed(
@@ -102,17 +102,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
     async def create(self, ctx: discord.ApplicationContext) -> None:
         """Create a new loot tracking event where participants can add items and see automatic distribution."""
 
-        # Check if command is used in allowed channels
-        if ctx.channel_id not in CHANNEL_IDS:
-            allowed_channels = [f"<#{channel_id}>" for channel_id in CHANNEL_IDS]
-            await ctx.respond(
-                embed=ErrorEmbed(title=None, description=f"This command can only be used in: {', '.join(allowed_channels)}"),
-                ephemeral=True,
-            )
-            return
-
-        modal = CreateEventModal(self, title="Create Loot Event")
-        await ctx.send_modal(modal)
+        await ctx.send_modal(CreateEventModal(self))
 
     @event.command(description="Join an active event to participate in loot tracking")
     async def join(self, ctx: discord.ApplicationContext) -> None:
@@ -127,7 +117,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
         if isinstance(ctx.channel, discord.Thread):
             thread_id = ctx.channel.id
 
-            event = await self.get_or_fetch_event_by_id(ctx.channel.id)
+            event = await self.get_or_fetch_event(ctx.channel.id)
             if event:
                 # Check if user is already a participant in this event
                 if str(ctx.author.id) in event.participants:
@@ -180,11 +170,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             await ctx.followup.send(
                 embed=ErrorEmbed(
                     title="No Active Events",
-                    description=(
-                        "There are no active events to join right now.\n\n"
-                        "**Want to create an event?**\n"
-                        f"• Use `/event create` in <#{CHANNEL_IDS[0]}>."
-                    ),
+                    description=("There are no active events to join right now.\n\n" "• Use `/event create` to create an event."),
                 ),
                 ephemeral=True,
             )
@@ -232,7 +218,6 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
                 "1. Use `/event create` to create an event or `/event join` to join an event.\n"
                 "2. Go to the event thread.\n"
                 "3. Use `/event loot` in that thread.\n\n"
-                f"**Find or create events in:** <#{CHANNEL_IDS[0]}>."
             ),
         )
 
@@ -242,7 +227,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             return
 
         thread_id = ctx.channel.id
-        event = await self.get_or_fetch_event_by_id(thread_id)
+        event = await self.get_or_fetch_event(thread_id)
         if not event:
             await ctx.respond(embed=thread_error_embed, ephemeral=True)
             return
@@ -298,7 +283,7 @@ class EventsCog(Cog, name="Events", guild_ids=GUILD_IDS):
             return
 
         thread_id = ctx.channel.id
-        event = await self.get_or_fetch_event_by_id(thread_id)
+        event = await self.get_or_fetch_event(thread_id)
         if not event:
             await ctx.followup.send(
                 embed=ErrorEmbed(title=None, description="This thread is not associated with an active event"),

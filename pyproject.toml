@@ -1,17 +1,18 @@
 [project]
 name = "qadir-bot"
-version = "3.1.2"
+version = "3.2.3"
 description = "A modular utility bot for Discord"
 authors = [{ name = "Bilal", email = "mail@bil.al" }]
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "py-cord[speed] (>=2.7.0rc1,<3.0.0)",
+    "py-cord[speed] (>=2.7.0rc2,<3.0.0)",
     "python-dotenv (>=1.1.0,<2.0.0)",
     "upstash-redis (>=1.4.0,<2.0.0)",
     "aiohttp (>=3.12.15,<4.0.0)",
     "pymongo (>=4.15.3,<5.0.0)",
     "beanie (>=2.0.0,<3.0.0)",
+    "pynacl (>=1.6.0,<2.0.0)",
 ]
 
 [build-system]

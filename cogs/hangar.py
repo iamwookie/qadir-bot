@@ -51,8 +51,8 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
     _REDIS_PREFIX: str = "qadir:hangar"
     _REDIS_TTL: int = 3600  # seconds
 
-    _OPEN_DURATION: int = 3900381  # milliseconds
-    _CLOSE_DURATION: int = 7200704  # milliseconds
+    _OPEN_DURATION: int = 3900496  # milliseconds
+    _CLOSE_DURATION: int = 7200917  # milliseconds
     _CYCLE_DURATION: int = _OPEN_DURATION + _CLOSE_DURATION
 
     # Original Timestamp: 2025-10-16T13:43:24.402-04:00 (EDT, UTC-4)
@@ -224,16 +224,13 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
         # Update each tracked embed
         for embed_item in embed_items:
             try:
-                message_id = int(embed_item.message_id)
-                channel_id = int(embed_item.channel_id)
-
-                channel = self.bot.get_partial_messageable(channel_id)
-                message = channel.get_partial_message(message_id)
+                channel = self.bot.get_partial_messageable(int(embed_item.channel_id))
+                message = channel.get_partial_message(int(embed_item.message_id))
                 await message.edit(embed=HangarEmbed(self._calculate_hangar_state()))
-
                 processed += 1
 
-                await asyncio.sleep(1)  # To avoid hitting rate limits
+                # Sleep briefly to avoid hitting rate limits
+                await asyncio.sleep(2)
             except discord.NotFound:
                 logger.warning(f"⌛⚠️ [HANGAR] [0] Cleaned Up Non-Existent Hangar Embed: {embed_item.message_id}")
                 # Remove the missing embed from tracking
@@ -314,7 +311,7 @@ class HangarCog(Cog, name="Hangar", guild_ids=GUILD_IDS):
             )
         )
 
-        logger.debug(f"[HANGAR] Created Hangar Timer Embed: {message.id}")
+        logger.debug(f"[HANGAR] Created Hangar Embed: {message.id}")
 
 
 def setup(bot: Qadir) -> None:
