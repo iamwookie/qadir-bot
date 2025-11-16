@@ -19,10 +19,6 @@ class AppConfig(TypedDict):
     version: str
 
 
-class ModerationConfig(TypedDict):
-    guilds: list[int]
-
-
 class ProposalsConfig(TypedDict):
     guilds: list[int]
     channels: list[int]
@@ -43,7 +39,6 @@ class VoiceConfig(TypedDict):
 
 class Config(TypedDict):
     app: AppConfig
-    moderation: ModerationConfig
     proposals: ProposalsConfig
     events: EventsConfig
     hangar: HangarConfig
