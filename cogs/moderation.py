@@ -62,7 +62,7 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
             )
             return
 
-        # Check if trying to ban the bot
+        # Check if trying to ban myself
         if member.id == ctx.guild.me.id:
             await ctx.respond(
                 embed=ErrorEmbed(description="I cannot ban myself"),
@@ -89,14 +89,15 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
         # Defer the response as banning might take a moment
         await ctx.defer()
 
-        # # Perform the ban
-        await member.ban(reason=f"{reason} (Banned by {ctx.author})", delete_message_seconds=delete_message_days * 86400)
+        # Perform the ban
+        await member.ban(reason=f"{reason} (Banned by {ctx.author.name})", delete_message_seconds=delete_message_days * 86400)
 
+        # Send a beautiful success embed
         embed = SuccessEmbed(title="Member Banned", description=(f"{member.mention} (`{member.id}`) has been banned\n"))
         embed.set_image(url="https://c.tenor.com/9zCgefg___cAAAAd/tenor.gif")
         await ctx.followup.send(embed=embed)
 
-        logger.info(f"[MODERATION] ({ctx.guild.id}) {ctx.author} Banned {member} ({member.id}) - Reason: {reason}")
+        logger.info(f"[MODERATION] ({ctx.guild.id}) {ctx.author.name} Banned {member.name} ({member.id}) - Reason: {reason}")
 
 
 def setup(bot: Qadir) -> None:
