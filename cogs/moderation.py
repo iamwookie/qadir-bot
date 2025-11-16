@@ -29,13 +29,7 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
     )
     @commands.has_permissions(ban_members=True)
     @commands.cooldown(1, 15.0, commands.BucketType.user)
-    async def ban(
-        self,
-        ctx: discord.ApplicationContext,
-        member: discord.Member,
-        reason: str,
-        delete_message_days: int,
-    ) -> None:
+    async def ban(self, ctx: discord.ApplicationContext, member: discord.Member, reason: str, delete_message_days: int) -> None:
         """
         Ban a member from the server.
 
@@ -89,38 +83,21 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
         # Defer the response as banning might take a moment
         await ctx.defer()
 
-        try:
-            # Perform the ban
-            await member.ban(reason=f"{reason} (Banned by {ctx.author.name})", delete_message_seconds=delete_message_days * 86400)
+        # Perform the ban
+        await member.ban(reason=f"{reason} (Banned by {ctx.author.name})", delete_message_seconds=delete_message_days * 86400)
 
-            embed = SuccessEmbed(description=f"{member.mention} (`{member.id}`) has been banned")
-            embed.set_image(url="https://c.tenor.com/9zCgefg___cAAAAd/tenor.gif")
-            await ctx.followup.send(embed=embed)
+        embed = SuccessEmbed(description=f"{member.mention} (`{member.id}`) has been banned")
+        embed.set_image(url="https://c.tenor.com/9zCgefg___cAAAAd/tenor.gif")
+        await ctx.followup.send(embed=embed)
 
-            logger.info(f"[MODERATION] {ctx.author.name} banned {member.name} ({member.id}) - Reason: {reason}")
-        except discord.Forbidden:
-            await ctx.followup.send(
-                embed=ErrorEmbed(description="I do not have permission to ban this member"),
-                ephemeral=True,
-            )
-        except discord.HTTPException as e:
-            await ctx.followup.send(
-                embed=ErrorEmbed(description=f"An error occurred while banning the member: {str(e)}"),
-                ephemeral=True,
-            )
-            logger.exception(f"[MODERATION] Error banning {member}")
+        logger.info(f"[MODERATION] {ctx.author.name} banned {member.name} ({member.id}) - Reason: {reason}")
 
     @discord.slash_command(description="Unban a user from the server")
     @discord.option("user_id", str, description="The ID of the user to unban")
     @discord.option("reason", str, description="The reason for the unban", required=False, default="N/A")
     @commands.has_permissions(ban_members=True)
     @commands.cooldown(1, 15.0, commands.BucketType.user)
-    async def unban(
-        self,
-        ctx: discord.ApplicationContext,
-        user_id: str,
-        reason: str,
-    ) -> None:
+    async def unban(self, ctx: discord.ApplicationContext, user_id: str, reason: str) -> None:
         """
         Unban a user from the server.
 
