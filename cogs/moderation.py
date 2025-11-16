@@ -15,16 +15,6 @@ logger = logging.getLogger("qadir")
 class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
     """A cog to manage guild moderation."""
 
-    def __init__(self, bot: Qadir) -> None:
-        """
-        Initialize the cog.
-
-        Args:
-            bot (Qadir): The bot instance to load the cog into
-        """
-
-        super().__init__(bot)
-
     @discord.slash_command(description="Ban a member from the server")
     @discord.option("member", discord.Member, description="The member to ban")
     @discord.option("reason", str, description="The reason for the ban", required=False, default="N/A")
