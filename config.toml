@@ -1,6 +1,6 @@
 [app]
 name = "Qadir"
-version = "3.3.0"
+version = "3.4.0"
 
 [moderation]
 guilds = [1217554572554408118]
