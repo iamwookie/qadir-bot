@@ -15,6 +15,16 @@ logger = logging.getLogger("qadir")
 class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
     """A cog to manage guild moderation."""
 
+    def __init__(self, bot: Qadir) -> None:
+        """
+        Initialize the cog.
+
+        Args:
+            bot (Qadir): The bot instance to load the cog into
+        """
+
+        super().__init__(bot)
+
     @discord.slash_command(description="Ban a member from the server")
     @discord.option("member", discord.Member, description="The member to ban")
     @discord.option("reason", str, description="The reason for the ban", required=False, default="N/A")
@@ -49,7 +59,7 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
         # Check if the bot has ban permissions
         if not ctx.guild.me.guild_permissions.ban_members:
             await ctx.respond(
-                embed=ErrorEmbed(title="Missing Permissions", description="I do not have permission to ban members"),
+                embed=ErrorEmbed(description="I do not have permission to ban members"),
                 ephemeral=True,
             )
             return
@@ -62,7 +72,7 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
             )
             return
 
-        # Check if trying to ban myself
+        # Check if trying to ban the bot
         if member.id == ctx.guild.me.id:
             await ctx.respond(
                 embed=ErrorEmbed(description="I cannot ban myself"),
@@ -89,15 +99,77 @@ class ModerationCog(Cog, name="Moderation", guild_ids=GUILD_IDS):
         # Defer the response as banning might take a moment
         await ctx.defer()
 
-        # Perform the ban
-        await member.ban(reason=f"{reason} (Banned by {ctx.author.name})", delete_message_seconds=delete_message_days * 86400)
+        try:
+            # Perform the ban
+            await member.ban(reason=f"{reason} (Banned by {ctx.author.name})", delete_message_seconds=delete_message_days * 86400)
 
-        # Send a beautiful success embed
-        embed = SuccessEmbed(title="Member Banned", description=(f"{member.mention} (`{member.id}`) has been banned\n"))
-        embed.set_image(url="https://c.tenor.com/9zCgefg___cAAAAd/tenor.gif")
+            embed = SuccessEmbed(description=f"{member.mention} (`{member.id}`) has been banned")
+            embed.set_image(url="https://c.tenor.com/9zCgefg___cAAAAd/tenor.gif")
+            await ctx.followup.send(embed=embed)
+
+            logger.info(f"[MODERATION] {ctx.author.name} banned {member.name} ({member.id}) - Reason: {reason}")
+        except discord.Forbidden:
+            await ctx.followup.send(
+                embed=ErrorEmbed(description="I do not have permission to ban this member"),
+                ephemeral=True,
+            )
+        except discord.HTTPException as e:
+            await ctx.followup.send(
+                embed=ErrorEmbed(description=f"An error occurred while banning the member: {str(e)}"),
+                ephemeral=True,
+            )
+            logger.exception(f"[MODERATION] Error banning {member}")
+
+    @discord.slash_command(description="Unban a user from the server")
+    @discord.option("user_id", str, description="The ID of the user to unban")
+    @discord.option("reason", str, description="The reason for the unban", required=False, default="N/A")
+    @commands.has_permissions(ban_members=True)
+    @commands.cooldown(1, 15.0, commands.BucketType.user)
+    async def unban(
+        self,
+        ctx: discord.ApplicationContext,
+        user_id: str,
+        reason: str,
+    ) -> None:
+        """
+        Unban a user from the server.
+
+        Args:
+            ctx (discord.ApplicationContext): The application context
+            user_id (str): The ID of the user to unban
+            reason (str): The reason for the unban
+        """
+
+        # Check if the bot has ban permissions
+        if not ctx.guild.me.guild_permissions.ban_members:
+            await ctx.respond(embed=ErrorEmbed(description="I do not have permission to unban members"), ephemeral=True)
+            return
+
+        # Validate user_id is a valid snowflake
+        try:
+            user_id_int = int(user_id)
+        except ValueError:
+            await ctx.respond(embed=ErrorEmbed(description="The user ID provided is not valid"), ephemeral=True)
+            return
+
+        # Defer the response as unbanning might take a moment
+        await ctx.defer()
+
+        # Check if the user is actually banned
+        try:
+            ban_entry = await ctx.guild.fetch_ban(discord.Object(user_id_int))
+        except discord.NotFound:
+            await ctx.followup.send(embed=ErrorEmbed(description=f"User with ID `{user_id}` is not banned"), ephemeral=True)
+            return
+
+        # Perform the unban
+        await ctx.guild.unban(ban_entry.user, reason=f"{reason} (Unbanned by {ctx.author.name})")
+
+        embed = SuccessEmbed(title="Member Unbanned", description=f"{ban_entry.user.mention} (`{ban_entry.user.id}`) has been unbanned")
+        embed.set_image(url="https://c.tenor.com/HWIXio7cvpoAAAAd/tenor.gif")
         await ctx.followup.send(embed=embed)
 
-        logger.info(f"[MODERATION] ({ctx.guild.id}) {ctx.author.name} Banned {member.name} ({member.id}) - Reason: {reason}")
+        logger.info(f"[MODERATION] {ctx.author.name} unbanned {ban_entry.user.name} ({ban_entry.user.id}) - Reason: {reason}")
 
 
 def setup(bot: Qadir) -> None:
