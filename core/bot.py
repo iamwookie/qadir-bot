@@ -69,14 +69,15 @@ class Qadir(discord.Bot):
 
         try:
             if isinstance(exception, CheckFailure):
-                embed = ErrorEmbed("Permission Denied", "You do not have permission to use this command")
-                await ctx.respond(embed=embed, ephemeral=True)
+                await ctx.respond(embed=ErrorEmbed("Permission Denied", "You do not have permission to use this command"), ephemeral=True)
             elif isinstance(exception, CommandOnCooldown):
-                embed = ErrorEmbed(
-                    "Command On Cooldown",
-                    f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds",
+                await ctx.respond(
+                    embed=ErrorEmbed(
+                        "Command On Cooldown",
+                        f"This command is on cooldown, try again in `{exception.retry_after:.2f}` seconds",
+                    ),
+                    ephemeral=True,
                 )
-                await ctx.respond(embed=embed, ephemeral=True)
             else:
                 logger.error("[COG] Application Command Error", exc_info=exception)
         except Exception:
