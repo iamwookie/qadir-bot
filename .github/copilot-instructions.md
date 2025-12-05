@@ -1,7 +1,9 @@
 # Qadir Bot - AI Agent Instructions
 
 ## Quick Start
-**See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design, data flows, and component interactions.**
+**Documentation References:**
+- **[ARCHITECTURE.md](../docs/ARCHITECTURE.md)** - Detailed system design, data flows, and component interactions
+- **[SUGGESTIONS.md](../docs/SUGGESTIONS.md)** - Code review suggestions ranked by priority (reference for enhancements and issues to consider; AI agents can add more suggestions to this file as they discover them)
 
 ## Project Overview
 Qadir is a modular Discord bot built with **Pycord** that provides utility, proposal voting, event/loot tracking, hangar management, and voice channel features. It uses **MongoDB + Beanie** for data persistence, **Upstash Redis** for caching, and modern Discord slash commands.

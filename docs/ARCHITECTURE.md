@@ -375,4 +375,3 @@ logger.exception("Exception with traceback")  # Use in except blocks
 5. **Button Click**: Button handler fetches `Proposal` from MongoDB (lazy-load), updates votes, calls `proposal.replace()`
 6. **Background Task**: `_process_proposals` loop (12-hour interval) checks for 24h+ old proposals, closes them
 7. **Cleanup**: `on_error()` handles missing threads/messages, deletes stale MongoDB records
-
