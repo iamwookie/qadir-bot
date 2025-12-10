@@ -71,6 +71,7 @@ See `config.toml` for configuration structure. Copy to `config.dev.toml` for dev
 - **Embed customization**: Pre-styled subclasses (`SuccessEmbed`, `ErrorEmbed`)
 - **Async throughout**: All Discord, Redis, and MongoDB operations require `await`
 - **ID handling**: Store Discord IDs as strings in MongoDB, convert to int when fetching
+- **Version bumps**: Update version in **3 files**: `config.toml`, `config.dev.toml`, and `pyproject.toml` (use semantic versioning)
 
 ## Debugging Quick Reference
 
