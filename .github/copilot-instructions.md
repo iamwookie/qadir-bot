@@ -6,7 +6,7 @@
 - **[SUGGESTIONS.md](../docs/SUGGESTIONS.md)** - Code review suggestions ranked by priority (reference for enhancements and issues to consider; AI agents can add more suggestions to this file as they discover them)
 
 ## Project Overview
-Qadir is a modular Discord bot built with **Pycord** that provides utility, proposal voting, event/loot tracking, hangar management, and voice channel features. It uses **MongoDB + Beanie** for data persistence, **Upstash Redis** for caching, and modern Discord slash commands.
+Qadir is a modular Discord bot built with **Pycord** that provides utility, proposal voting, hangar management, and voice channel features. It uses **MongoDB + Beanie** for data persistence, **Upstash Redis** for caching, and modern Discord slash commands.
 
 **Key Tech Stack:** Python 3.12.3 | Pycord (discord.py fork) | Beanie ODM | MongoDB | Upstash Redis | Poetry
 
@@ -15,7 +15,6 @@ Qadir is a modular Discord bot built with **Pycord** that provides utility, prop
 ### Setup
 ```powershell
 poetry install --no-root
-# Create config.dev.toml with your Discord/MongoDB/Redis credentials
 ```
 
 ### Run
@@ -23,10 +22,17 @@ poetry install --no-root
 poetry run python main.py
 ```
 
-### Configuration
-1. Copy `config.toml` → `config.dev.toml` and update credentials
-2. Environment variables (`.env`): `DISCORD_TOKEN`, `MONGODB_URI`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `APP_DEBUG=true`, `PYTHON_ENV=development`
+### Code Quality Checks
+**Always run after making changes:**
+```powershell
+poetry run pre-commit run --all-files
+```
+This validates code formatting (black), import sorting (isort), and linting (ruff).
 
+### Configuration
+Environment variables (`.env`): `DISCORD_TOKEN`, `MONGODB_URI`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `APP_DEBUG=true`, `PYTHON_ENV=development`
+
+See `config.toml` for configuration structure. Copy to `config.dev.toml` for development overrides.
 ### Logging
 - Logger name: `"qadir"` (configured in `main.py`)
 - Writes to console + `qadir.log`
@@ -34,11 +40,11 @@ poetry run python main.py
 - Use in cogs: `logger = logging.getLogger("qadir")`
 
 ## Common Tasks
-
 ### Add a new slash command
 1. Create cog file in `cogs/` extending `core.Cog`
 2. Define command with `@discord.slash_command()` or `@discord.SlashCommandGroup()`
 3. Load in `main.py`: `bot.load_extension("cogs.my_feature")`
+4. **Keep cog ordering consistent** - maintain the same order across `main.py`, `config.py`, and imports
 
 ### Add a data model
 1. Create file in `models/` extending `beanie.Document`

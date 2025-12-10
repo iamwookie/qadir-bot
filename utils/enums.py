@@ -6,12 +6,6 @@ class ProposalStatus(str, Enum):
     CLOSED = "closed"
 
 
-class EventStatus(str, Enum):
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ARCHIVED = "archived"
-
-
 class HangarStatus(str, Enum):
     ONLINE = "ONLINE"
     OFFLINE = "OFFLINE"

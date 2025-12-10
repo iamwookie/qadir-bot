@@ -1,7 +1,7 @@
 # Qadir Bot - Architecture
 
 ## Project Overview
-Qadir is a modular Discord bot built with **Pycord** that provides utility, proposal voting, event/loot tracking, hangar management, and voice channel features. It uses **MongoDB + Beanie** for data persistence, **Upstash Redis** for caching, and modern Discord slash commands.
+Qadir is a modular Discord bot built with **Pycord** that provides utility, proposal voting, hangar management, and voice channel features. It uses **MongoDB + Beanie** for data persistence, **Upstash Redis** for caching, and modern Discord slash commands.
 
 **Key Tech Stack:** Python 3.12.3 | Pycord (discord.py fork) | Beanie ODM | MongoDB | Upstash Redis | Poetry
 
@@ -9,8 +9,8 @@ Qadir is a modular Discord bot built with **Pycord** that provides utility, prop
 
 ### Directory Layout
 - **`core/bot.py`** - Custom `Qadir` Discord bot class extending `discord.Bot`. Initializes Redis, MongoDB, and manages the `_initialised` event. Auto-discovers and loads cogs on startup.
-- **`cogs/`** - Feature modules (utility, proposals, events, hangar, voice). Each cog extends `core.Cog`, which wraps the bot instance and provides `self.redis` access.
-- **`models/`** - **Beanie Document models** (not Pydantic BaseModels). Use `@Document` decorator with `Settings` for collection names and indexes. Examples: `Proposal`, `Event`, `HangarEmbedItem`.
+- **`cogs/`** - Feature modules (utility, proposals, hangar, voice). Each cog extends `core.Cog`, which wraps the bot instance and provides `self.redis` access.
+- **`models/`** - **Beanie Document models** (not Pydantic BaseModels). Use `@Document` decorator with `Settings` for collection names and indexes. Examples: `Proposal`, `HangarEmbedItem`.
 - **`utils/`** - Shared utilities: custom embeds, modals, views, helpers, and enums.
 
 ### Component Interaction
@@ -52,7 +52,7 @@ def cog_unload(self):
     self._process_items.cancel()
 ```
 
-Example implementations: `proposals.py` (_process_proposals), `events.py` (_restore_voting_views)
+Example implementations: `proposals.py` (_process_proposals), `hangar.py` (state processing)
 
 ## Data Persistence
 
@@ -104,33 +104,33 @@ await item.delete()
 Use Redis for frequently-accessed data with short TTL. Always fall back to MongoDB on cache miss:
 
 ```python
-REDIS_PREFIX = "qadir:events"
+REDIS_PREFIX = "qadir:proposals"
 REDIS_TTL = 3600  # 1 hour
 
-async def get_or_fetch_event(self, thread_id: int) -> Event | None:
+async def get_or_fetch_proposal(self, thread_id: int) -> Proposal | None:
     # Try cache first
     cached = await self.redis.get(f"{REDIS_PREFIX}:{thread_id}")
     if cached:
-        return Event(**json.loads(cached))
+        return Proposal(**json.loads(cached))
     
     # Fall back to MongoDB
-    event = await Event.find_one(Event.thread_id == str(thread_id))
-    if event:
+    proposal = await Proposal.find_one(Proposal.thread_id == str(thread_id))
+    if proposal:
         # Populate cache
         await self.redis.set(
             f"{REDIS_PREFIX}:{thread_id}",
-            json.dumps(event.model_dump(), default=str),
+            json.dumps(proposal.model_dump(), default=str),
             ex=REDIS_TTL,
         )
-        return event
+        return proposal
     
     return None
 ```
 
 **Cache invalidation:** Always delete from Redis when data changes:
 ```python
-await event.replace()  # Update MongoDB
-await self.redis.delete(f"{REDIS_PREFIX}:{event.thread_id}")  # Invalidate cache
+await proposal.replace()  # Update MongoDB
+await self.redis.delete(f"{REDIS_PREFIX}:{proposal.thread_id}")  # Invalidate cache
 ```
 
 ## Discord UI Components
@@ -201,7 +201,7 @@ from config import config
 
 # Access config anywhere
 guild_ids = config["proposals"]["guilds"]
-channels = config["events"]["channels"]
+channels = config["voice"]["channels"]
 ```
 
 ### Environment Variables
@@ -237,16 +237,12 @@ class ProposalsCog(Cog, name="Proposals", guild_ids=[123456789]):
 
 ### Command Groups
 ```python
-class EventsCog(Cog):
-    event = discord.SlashCommandGroup("event", "Manage events")
+class HangarCog(Cog):
+    hangar = discord.SlashCommandGroup("hangar", "Manage hangar status")
     
-    @event.command(description="Create event")
-    async def create(self, ctx: discord.ApplicationContext) -> None:
-        await ctx.send_modal(CreateEventModal())
-    
-    @event.command(description="Join event")
-    async def join(self, ctx: discord.ApplicationContext) -> None:
-        await ctx.respond("Joined!")
+    @hangar.command(description="Show hangar status")
+    async def status(self, ctx: discord.ApplicationContext) -> None:
+        await ctx.respond("Hangar status placeholder")
 ```
 
 ### Deferred Responses (Long Operations)
@@ -268,11 +264,6 @@ Defined in `utils/enums.py` as `str` Enums for MongoDB compatibility:
 class ProposalStatus(str, Enum):
     ACTIVE = "active"
     CLOSED = "closed"
-
-class EventStatus(str, Enum):
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ARCHIVED = "archived"
 ```
 
 Use for type-safe filtering:

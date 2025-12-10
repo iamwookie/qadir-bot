@@ -59,7 +59,6 @@ class UtilityCog(Cog, name="Utility"):
         # Group commands by category for better organization
         utility_commands: list[tuple[str, str]] = []
         proposal_commands: list[tuple[str, str]] = []
-        event_commands: list[tuple[str, str]] = []
         hangar_commands: list[tuple[str, str]] = []
         other_commands: list[tuple[str, str]] = []
 
@@ -86,8 +85,6 @@ class UtilityCog(Cog, name="Utility"):
                             utility_commands.append((command_name, command_desc))
                         elif cog_name_lower == "proposals":
                             proposal_commands.append((command_name, command_desc))
-                        elif cog_name_lower == "events":
-                            event_commands.append((command_name, command_desc))
                         elif cog_name_lower == "hangar":
                             hangar_commands.append((command_name, command_desc))
                         else:
@@ -112,8 +109,6 @@ class UtilityCog(Cog, name="Utility"):
                                     utility_commands.append((subcommand_name, subcommand_desc))
                                 elif cog_name_lower == "proposals":
                                     proposal_commands.append((subcommand_name, subcommand_desc))
-                                elif cog_name_lower == "events":
-                                    event_commands.append((subcommand_name, subcommand_desc))
                                 elif cog_name_lower == "hangar":
                                     hangar_commands.append((subcommand_name, subcommand_desc))
                                 else:
@@ -126,11 +121,6 @@ class UtilityCog(Cog, name="Utility"):
         if proposal_commands:
             embed.add_field(name="📋 **Proposal Commands**", value="", inline=False)
             for name, desc in proposal_commands:
-                embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
-
-        if event_commands:
-            embed.add_field(name="🏆 **Event Commands**", value="", inline=False)
-            for name, desc in event_commands:
                 embed.add_field(name=f"`{name}`", value=f"᲼⤷ {desc}", inline=False)
 
         if hangar_commands:

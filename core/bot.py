@@ -43,7 +43,6 @@ class Qadir(discord.Bot):
             database=self.db,
             document_models=[
                 "models.proposals.Proposal",
-                "models.events.Event",
                 "models.hangar.HangarEmbedItem",
             ],
         )
